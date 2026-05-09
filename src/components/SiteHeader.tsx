@@ -11,6 +11,7 @@ const nav = [
   { to: '/players', label: 'Игроки' },
   { to: '/tournaments', label: 'Турниры' },
 { to: '/my-team', label: 'Моя команда' },
+]
 
 
 export function SiteHeader() {
