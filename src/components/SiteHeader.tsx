@@ -13,7 +13,6 @@ const nav = [
 { to: '/my-team', label: 'Моя команда' },
 ]
 
-
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
