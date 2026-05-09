@@ -10,7 +10,7 @@ const nav = [
   { to: '/teams', label: 'Команды' },
   { to: '/players', label: 'Игроки' },
   { to: '/tournaments', label: 'Турниры' },
-{ to: '/my-team', label: 'Моя команда' },
+  { to: '/my-team', label: 'Моя команда' },
 ]
 
 export function SiteHeader() {
