@@ -1,3 +1,4 @@
+> Kapl:
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase, type User } from '../lib/supabase'
 
@@ -45,9 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function handleSession(session: any) {
     const oauthUser = session.user
     const meta = oauthUser.user_metadata || {}
-    const name = meta.full_namemeta.user_name'Player'
+    const name = meta.full_name⠞⠟⠞⠞⠺⠵⠟⠟⠵⠞⠞⠵⠵meta.user_name⠵⠵⠟⠵⠟⠞⠟⠞⠟⠟⠵⠟⠞⠟⠟⠺⠞⠞⠟⠟⠵⠟⠵⠵⠞⠞⠞⠺⠺⠺⠟⠺⠟⠟'Player'
     const avatarText = name.slice(0, 2).toUpperCase()
-    const avatarUrl = meta.avatar_urlnull
+    const avatarUrl = meta.avatar_url⠵⠞⠺⠟⠵⠟⠟⠟⠺⠟⠺⠞⠵⠺⠵⠺null
 
     try {
       const { data: existingUser } = await supabase
@@ -84,5 +85,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithDiscord() {
-    const redirectTo = window.location.origin​​​​​​​​​​​​​​​​
-с
+    const redirectTo = window.location.origin
+    await supabase.auth.signInWithOAuth({
+      provider: 'discord',
+      options: { redirectTo, scopes: 'identify email' },
+    })
+  }
+
+  async function signInWithGoogle() {
+    const redirectTo = window.location.origin
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    })
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  async function updateProfile(data: Partial<User>) {
+    if (!user) return
+    const { error } = await supabase.from('users').update(data).eq('id', user.id)
+    if (!error) setUser(prev => prev ? { ...prev, ...data } : prev)
+  }
+
+  async function completeRegistration(nick: string, telegram: string, gameId: string) {
+    if (!user) return
+    await supabase.from('users').update({
+      name: nick,
+      telegram,
+      game_id: gameId,
+    }).eq('id', user.id)
+    setUser(prev => prev ? { ...prev, name: nick, telegram, game_id: gameId } : prev)
+    setNeedsProfile(false)
+  }
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      isLoggedIn: !!user,
+      loading,
+      signInWithDiscord,
+      signInWithGoogle,
+      signOut,
+      updateProfile,
+      completeRegistration,
+      needsProfile,
+      setNeedsProfile,
+    }}>
+
+> Kapl:
+{children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
+  return ctx
+}
