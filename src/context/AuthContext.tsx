@@ -1,4 +1,3 @@
-> Kapl:
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase, type User } from '../lib/supabase'
 
@@ -135,8 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       needsProfile,
       setNeedsProfile,
     }}>
-
-> Kapl:
 {children}
     </AuthContext.Provider>
   )
