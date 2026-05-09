@@ -45,9 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function handleSession(session: any) {
     const oauthUser = session.user
     const meta = oauthUser.user_metadata || {}
-    const name = meta.full_name⠞⠟⠞⠞⠺⠵⠟⠟⠵⠞⠞⠵⠵meta.user_name⠵⠵⠟⠵⠟⠞⠟⠞⠟⠟⠵⠟⠞⠟⠟⠺⠞⠞⠟⠟⠵⠟⠵⠵⠞⠞⠞⠺⠺⠺⠟⠺⠟⠟'Player'
+    const name = meta.full_name  meta.name  meta.user_name  oauthUser.email?.split('@')[0]  'Player'
     const avatarText = name.slice(0, 2).toUpperCase()
-    const avatarUrl = meta.avatar_url⠵⠞⠺⠟⠵⠟⠟⠟⠺⠟⠺⠞⠵⠺⠵⠺null
+    const avatarUrl = meta.avatar_url  meta.picture  null
 
     try {
       const { data: existingUser } = await supabase
