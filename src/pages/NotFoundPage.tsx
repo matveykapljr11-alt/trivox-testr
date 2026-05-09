@@ -1,4 +1,3 @@
-> Kapl:
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 
@@ -74,7 +73,6 @@ export default function NotFoundPage() {
           <span className="text-white/90 font-semibold">Вернись на базу.</span>
         </p>
 
-> Kapl:
 <div className="mt-8 flex flex-wrap gap-3">
           <Link to="/" className="press inline-flex h-12 items-center gap-2 rounded-lg bg-white px-6 text-sm font-bold uppercase tracking-wider text-foreground transition hover:opacity-90">
             <ArrowLeft className="h-4 w-4" /> На главную
