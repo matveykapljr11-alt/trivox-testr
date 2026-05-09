@@ -32,8 +32,6 @@ function CreateTeamModal({ open, onClose, onCreated }: { open: boolean; onClose:
         owner_id: user.id,
         discord: discord.trim() || null,
         telegram: telegram.trim() || null,
-        rating: 1000,
-        wins: 0,
       }).select().single()
 
       if (error) throw error
