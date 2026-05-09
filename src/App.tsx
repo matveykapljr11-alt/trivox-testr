@@ -9,6 +9,7 @@ import PlayersPage from './pages/PlayersPage'
 import TournamentsPage from './pages/TournamentsPage'
 import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
+import MyTeamPage from './pages/MyTeamPage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
+          <Route path="/my-team" element={<MyTeamPage />} />
         </Routes>
         <Toaster
           position="bottom-right"
