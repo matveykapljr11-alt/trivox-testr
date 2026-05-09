@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const meta = oauthUser.user_metadata || {}
     const name = meta.full_name || meta.name || meta.user_name || oauthUser.email?.split('@')[0] || 'Player'
     const avatarText = name.slice(0, 2).toUpperCase()
-    const avatarUrl = meta.avatar_url  meta.picture  null
+    const avatarUrl = meta.avatar_url || meta.picture || null
 
     try {
       const { data: existingUser } = await supabase
