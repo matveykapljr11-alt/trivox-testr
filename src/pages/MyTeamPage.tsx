@@ -3,22 +3,35 @@ import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Navigate } from 'react-router-dom'
-import { Users, Calendar, Plus } from 'lucide-react'
+import { Users, Calendar, Plus, Trophy, Swords } from 'lucide-react'
 
-const DAYS = [
-  { label: 'Вс', date: new Date(Date.now() + 0 * 86400000) },
-  { label: 'Пн', date: new Date(Date.now() + 1 * 86400000) },
-  { label: 'Вт', date: new Date(Date.now() + 2 * 86400000) },
-  { label: 'Ср', date: new Date(Date.now() + 3 * 86400000) },
-  { label: 'Чт', date: new Date(Date.now() + 4 * 86400000) },
-  { label: 'Пт', date: new Date(Date.now() + 5 * 86400000) },
-  { label: 'Сб', date: new Date(Date.now() + 6 * 86400000) },
-]
+// Generate next 7 days starting from today
+function getDays() {
+  const days = []
+  const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+  for (let i = 0; i < 7; i++) {
+    const date = new Date()
+    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() + i)
+    days.push({ label: dayLabels[date.getDay()], date })
+  }
+  return days
+}
+
+const DAYS = getDays()
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
 
 export default function MyTeamPage() {
   const { user, isLoggedIn } = useAuth()
   const [team, setTeam] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
+  const [scrims, setScrims] = useState<any[]>([])
+  const [tournaments, setTournaments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
 
@@ -27,20 +40,49 @@ export default function MyTeamPage() {
     async function load() {
       setLoading(true)
       try {
+        // Load team
         const { data: myTeam } = await supabase
           .from('teams')
           .select('*')
           .eq('owner_id', user!.id)
           .single()
+
         if (myTeam) {
           setTeam(myTeam)
+
+          // Load members
           const { data: m } = await supabase
             .from('team_members')
             .select('*')
             .eq('team_id', myTeam.id)
           setMembers(m || [])
+
+          // Load scrims for this team (by team name or user_id)
+          const { data: s } = await supabase
+            .from('scrims')
+            .select('*')
+            .eq('user_id', user!.id)
+            .neq('status', 'cancelled')
+          setScrims(s || [])
+
+          // Load tournaments where team is registered
+          const { data: tt } = await supabase
+            .from('tournament_teams')
+            .select('tournament_id')
+            .eq('team_id', myTeam.id)
+
+          if (tt && tt.length > 0) {
+            const ids = tt.map((x: any) => x.tournament_id)
+            const { data: tours } = await supabase
+              .from('tournaments')
+              .select('*')
+              .in('id', ids)
+            setTournaments(tours || [])
+          }
         }
-      } catch {}
+      } catch (e) {
+        console.error(e)
+      }
       setLoading(false)
     }
     load()
@@ -50,6 +92,30 @@ export default function MyTeamPage() {
 
   const selectedDate = DAYS[selectedDay].date
   const dateStr = selectedDate.toLocaleDateString('ru', { day: 'numeric', month: 'long' })
+
+  // Get scrims for selected day using time_raw
+  const dayScrimEvents = scrims.filter(s => {
+    if (!s.time_raw) return false
+    const d = new Date(s.time_raw)
+    return isSameDay(d, selectedDate)
+  })
+
+  // Get tournaments for selected day using start_date
+  const dayTournamentEvents = tournaments.filter(t => {
+    if (!t.start_date) return false
+    // start_date is "2026-04-30" format
+    const d = new Date(t.start_date + 'T00:00:00')
+    return isSameDay(d, selectedDate)
+  })
+
+  const totalEvents = dayScrimEvents.length + dayTournamentEvents.length
+
+  // Check which days have events (for dot indicators)
+  function dayHasEvents(date: Date) {
+    const hasScrim = scrims.some(s => s.time_raw && isSameDay(new Date(s.time_raw), date))
+    const hasTour = tournaments.some(t => t.start_date && isSameDay(new Date(t.start_date + 'T00:00:00'), date))
+    return hasScrim || hasTour
+  }
 
   return (
     <PageShell>
@@ -98,8 +164,7 @@ export default function MyTeamPage() {
                   <button
                     key={i}
                     onClick={() => setSelectedDay(i)}
-
-className={`press flex-shrink-0 flex flex-col items-center rounded-xl border px-4 py-3 transition ${
+                    className={`press flex-shrink-0 flex flex-col items-center rounded-xl border px-4 py-3 transition relative ${
                       selectedDay === i
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-muted/40 hover:border-primary/40'
@@ -107,6 +172,12 @@ className={`press flex-shrink-0 flex flex-col items-center rounded-xl border px-
                   >
                     <span className="text-xs font-semibold uppercase">{d.label}</span>
                     <span className="font-display text-lg">{d.date.getDate()}</span>
+                    {/* Event dot indicator */}
+                    {dayHasEvents(d.date) && (
+                      <span className={`absolute bottom-1.5 h-1.5 w-1.5 rounded-full ${
+                        selectedDay === i ? 'bg-primary-foreground' : 'bg-primary'
+                      }`} />
+                    )}
                   </button>
                 ))}
               </div>
@@ -114,14 +185,83 @@ className={`press flex-shrink-0 flex flex-col items-center rounded-xl border px-
               {/* Events for selected day */}
               <div className="mt-4">
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  {dateStr}
+                  {dateStr} · {totalEvents > 0 ? `${totalEvents} событий` : 'нет событий'}
                 </div>
-                <div className="rounded-xl border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">Нет праков на этот день</p>
-                  <button className="press mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary to-electric px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90">
-                    <Plus className="h-3.5 w-3.5" /> Запланировать прак
-                  </button>
-                </div>
+
+                {totalEvents === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">Нет праков и турниров на этот день</p>
+                    <a
+                      href="/praki"
+                      className="press mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary to-electric px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Запланировать прак
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Scrims */}
+                    {dayScrimEvents.map(scrim => {
+                      const time = scrim.time_raw
+                        ? new Date(scrim.time_raw).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })
+                        : scrim.time_text
+                      return (
+                        <div key={scrim.id} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                          <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-primary/10">
+                            <Swords className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                                Прак
+                              </span>
+                              <span className="text-xs text-muted-foreground">{time}</span>
+                            </div>
+                            <div className="mt-0.5 font-semibold text-sm truncate">{scrim.team_name}</div>
+                            <div className="text-xs text-muted-foreground">{scrim.format} · {scrim.rank}</div>
+                          </div>
+                          <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            scrim.status === 'open' ? 'bg-green-500/10 text-green-600' :
+                            scrim.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {scrim.status === 'open' ? 'Открыт' : scrim.status === 'pending' ? 'Ждём' : scrim.status}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Tournaments */}
+                    {dayTournamentEvents.map(tour => (
+                      <div key={tour.id} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                        <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-yellow-500/10">
+                          <Trophy className="h-5 w-5 text-yellow-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-600 bg-yellow-500/10 rounded-full px-2 py-0.5">
+                              Турнир
+                            </span>
+                            {tour.start_time && (
+                              <span className="text-xs text-muted-foreground">{tour.start_time}</span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 font-semibold text-sm truncate">{tour.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {tour.format}{tour.prize && tour.prize !== 'No prize' ? ` · 🏆 ${tour.prize}` : ''}
+                          </div>
+                        </div>
+                        <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          tour.status === 'open' ? 'bg-green-500/10 text-green-600' :
+                          tour.status === 'upcoming' ? 'bg-blue-500/10 text-blue-600' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                          {tour.status === 'open' ? 'Открыт' : tour.status === 'upcoming' ? 'Скоро' : tour.status}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
