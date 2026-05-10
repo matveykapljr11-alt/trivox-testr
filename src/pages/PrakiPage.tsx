@@ -18,6 +18,32 @@ const chips = [
   { id: 'mr9', label: 'MR9' },
 ]
 
+// Helper: format date for display
+function formatDateLabel(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const today = new Date()
+  const tomorrow = new Date()
+  tomorrow.setDate(today.getDate() + 1)
+
+  const hh = date.getHours().toString().padStart(2, '0')
+  const mm = date.getMinutes().toString().padStart(2, '0')
+  const time = `${hh}:${mm}`
+
+  if (date.toDateString() === today.toDateString()) return `Сегодня, ${time}`
+  if (date.toDateString() === tomorrow.toDateString()) return `Завтра, ${time}`
+
+  const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+  return `${days[date.getDay()]}, ${date.getDate()}.${(date.getMonth() + 1).toString().padStart(2, '0')} ${time}`
+}
+
+// Get min datetime string for input (now)
+function getNowDatetimeLocal(): string {
+  const now = new Date()
+  now.setSeconds(0, 0)
+  return now.toISOString().slice(0, 16)
+}
+
 // Create Scrim Modal
 function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
@@ -25,10 +51,12 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   const [rank, setRank] = useState('Mythic I')
   const [format, setFormat] = useState('5x5 / MR12')
   const [selectedMaps, setSelectedMaps] = useState<string[]>([])
-  const [timeText, setTimeText] = useState('')
+  const [scrimDatetime, setScrimDatetime] = useState('')
   const [discord, setDiscord] = useState('')
   const [telegram, setTelegram] = useState(user?.telegram || '')
   const [loading, setLoading] = useState(false)
+
+  const timeLabel = scrimDatetime ? formatDateLabel(scrimDatetime) : 'Время не указано'
 
   // Preview
   const preview = {
@@ -36,7 +64,7 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
     rank,
     format,
     maps: selectedMaps.length ? selectedMaps : ['—'],
-    time_text: timeText || 'Время не указано',
+    time_text: timeLabel,
   }
 
   function toggleMap(map: string) {
@@ -45,18 +73,19 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
   async function handleCreate() {
     if (!teamName.trim()) { toast.error('Укажи название команды'); return }
-    if (!timeText.trim()) { toast.error('Укажи время прака'); return }
+    if (!scrimDatetime) { toast.error('Укажи дату и время прака'); return }
     if (!user) return
 
     setLoading(true)
     try {
+      const timeRaw = new Date(scrimDatetime).toISOString()
       const { error } = await supabase.from('scrims').insert({
         team_name: teamName.trim(),
         rank,
         format,
         maps: selectedMaps,
-        time_text: timeText.trim(),
-        time_raw: new Date().toISOString(),
+        time_text: timeLabel,
+        time_raw: timeRaw,
         status: 'open',
         user_id: user.id,
         discord: discord.trim() || null,
@@ -66,6 +95,8 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
       toast.success('Прак создан!', { description: 'Лобби открыто, ждём соперников' })
       onCreated()
       onClose()
+      // reset
+      setTeamName(''); setSelectedMaps([]); setScrimDatetime(''); setDiscord(''); setTelegram('')
     } catch (e: any) {
       toast.error('Ошибка создания прака: ' + (e.message || ''))
     } finally {
@@ -169,14 +200,21 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
             </div>
           </div>
 
+          {/* DATE + TIME PICKER */}
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Время прака *</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Дата и время прака *
+            </label>
             <input
-              value={timeText}
-              onChange={e => setTimeText(e.target.value)}
-              placeholder="Сегодня, 21:00 / Завтра, 19:30"
-              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              type="datetime-local"
+              value={scrimDatetime}
+              onChange={e => setScrimDatetime(e.target.value)}
+              min={getNowDatetimeLocal()}
+              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 [color-scheme:dark]"
             />
+            {scrimDatetime && (
+              <p className="mt-1.5 text-xs text-primary font-medium">📅 {timeLabel}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -350,8 +388,9 @@ export default function PrakiPage() {
       if (filter === 'mr12') return m.format.includes('MR12')
       if (filter === 'mr9') return m.format.includes('MR9')
       if (filter === 'today') {
-        const created = new Date(m.created_at)
-        return Date.now() - created.getTime() < 8 * 60 * 60 * 1000
+        const t = m.time_raw ? new Date(m.time_raw) : new Date(m.created_at)
+        const today = new Date()
+        return t.toDateString() === today.toDateString()
       }
       return true
     }).filter(m =>
