@@ -192,7 +192,7 @@ export default function MyTeamPage() {
                   <div className="rounded-xl border border-dashed border-border p-6 text-center">
                     <p className="text-sm text-muted-foreground">Нет праков и турниров на этот день</p>
                     <a
-                      href="/praki"
+                      <a href="/praki" onClick={e => { e.preventDefault(); window.location.href = '/praki' }}
                       className="press mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary to-electric px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90"
                     >
                       <Plus className="h-3.5 w-3.5" /> Запланировать прак
