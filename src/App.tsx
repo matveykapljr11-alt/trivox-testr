@@ -23,8 +23,8 @@ export default function App() {
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="*" element={<NotFoundPage />} />
           <Route path="/my-team" element={<MyTeamPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <Toaster
           position="bottom-right"
