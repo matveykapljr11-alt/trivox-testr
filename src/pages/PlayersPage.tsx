@@ -16,7 +16,7 @@ const roles = [
   { id: 'Manager', icon: Briefcase, role: 'Manager', desc: 'Менеджер' },
 ]
 
-const RANKS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legendary', 'Mythic I', 'Mythic II', 'Champion']
+const RANKS = ['Gold IV и ниже', 'Phoenix', 'Ranger', 'Champion', 'Master', 'Elite', 'Legend']
 
 type Player = {
   id: string
