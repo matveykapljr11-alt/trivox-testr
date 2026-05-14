@@ -36,7 +36,6 @@ function CreateTeamModal({ open, onClose, onCreated }: { open: boolean; onClose:
 
       if (error) throw error
 
-      // Add owner as first member
       if (team) {
         await supabase.from('team_members').insert({
           team_id: team.id,
@@ -107,7 +106,12 @@ function CreateTeamModal({ open, onClose, onCreated }: { open: boolean; onClose:
   )
 }
 
-function TeamCard({ team, onJoin, canJoin }: { team: Team; onJoin: (t: Team) => void; canJoin: boolean }) {
+function TeamCard({ team, memberCount, onJoin, canJoin }: {
+  team: Team
+  memberCount: number
+  onJoin: (t: Team) => void
+  canJoin: boolean
+}) {
   const initials = team.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const isOpen = team.status?.toLowerCase().includes('набор') || team.status?.toLowerCase().includes('ищут')
   return (
@@ -129,7 +133,7 @@ function TeamCard({ team, onJoin, canJoin }: { team: Team; onJoin: (t: Team) => 
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Rating</div>
         </div>
         <div className="rounded-lg bg-muted/60 p-2">
-          <div className="font-display text-sm">5</div>
+          <div className="font-display text-sm">{memberCount}</div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Players</div>
         </div>
         <div className="rounded-lg bg-muted/60 p-2">
@@ -166,6 +170,7 @@ const tabs = [
 export default function TeamsPage() {
   const { user, isLoggedIn } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
+  const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
   const [sort, setSort] = useState<'rating' | 'wins'>('rating')
@@ -181,18 +186,27 @@ export default function TeamsPage() {
         .select('*')
         .eq('game', 's2')
         .order('created_at', { ascending: false })
-      if (!error && data) setTeams(data)
+
+      if (!error && data && data.length > 0) {
+        setTeams(data)
+
+        // Load member counts for all teams
+        const { data: members } = await supabase
+          .from('team_members')
+          .select('team_id')
+
+        if (members) {
+          const counts: Record<string, number> = {}
+          members.forEach((m: any) => {
+            counts[m.team_id] = (counts[m.team_id] || 0) + 1
+          })
+          setMemberCounts(counts)
+        }
+      } else {
+        setTeams([])
+      }
     } catch {
-      setTeams([
-        { id: '1', name: 'VOID Esports', tag: 'VOID', region: 'RU', rating: 1842, wins: 124, status: 'Открыт набор', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '2', name: 'NorthFrame', tag: 'NF', region: 'EU', rating: 1798, wins: 98, status: 'Полный состав', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '3', name: 'Polar Wolves', tag: 'PW', region: 'RU', rating: 1721, wins: 76, status: 'Ищут IGL', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '4', name: 'Echo.GG', tag: 'EGG', region: 'CIS', rating: 1689, wins: 65, status: 'Открыт набор', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '5', name: 'Blue Phoenix', tag: 'BPX', region: 'RU', rating: 1610, wins: 53, status: 'Полный состав', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '6', name: 'Static Wave', tag: 'SW', region: 'EU', rating: 1574, wins: 41, status: 'Ищут AWP', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '7', name: 'Crimson Pact', tag: 'CP', region: 'AS', rating: 1523, wins: 38, status: 'Ищут саппорта', game: 's2', owner_id: 'demo', created_at: '' },
-        { id: '8', name: 'Halo Squad', tag: 'HS', region: 'RU', rating: 1488, wins: 32, status: 'Открыт набор', game: 's2', owner_id: 'demo', created_at: '' },
-      ])
+      setTeams([])
     } finally {
       setLoading(false)
     }
@@ -232,7 +246,6 @@ export default function TeamsPage() {
         description="Просматривай открытые команды, фильтруй по региону и рейтингу, отправляй заявки или создавай свою команду."
       />
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
-        {/* Controls */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative">
@@ -267,17 +280,26 @@ export default function TeamsPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-56 rounded-2xl skeleton" />)}
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+            <h3 className="font-display text-xl uppercase">Команд пока нет</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Создай первую команду!</p>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filtered.map((t, i) => (
               <div key={t.id} style={{ animationDelay: `${i * 40}ms` }}>
-                <TeamCard team={t} onJoin={handleJoin} canJoin={isLoggedIn && user?.id !== t.owner_id} />
+                <TeamCard
+                  team={t}
+                  memberCount={memberCounts[t.id] || 0}
+                  onJoin={handleJoin}
+                  canJoin={isLoggedIn && user?.id !== t.owner_id}
+                />
               </div>
             ))}
           </div>
         )}
 
-        {/* CTA */}
         <div className="mt-10 rounded-2xl border border-dashed border-border bg-card p-8 text-center">
           <Trophy className="mx-auto h-7 w-7 text-primary" />
           <h3 className="mt-3 font-display text-2xl uppercase">Нет подходящей команды?</h3>
