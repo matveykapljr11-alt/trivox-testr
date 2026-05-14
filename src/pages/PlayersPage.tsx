@@ -16,6 +16,18 @@ const roles = [
   { id: 'Manager', icon: Briefcase, role: 'Manager', desc: 'Менеджер' },
 ]
 
+const playerRoles = [
+  { id: 'IGL', icon: Crown, role: 'IGL', desc: 'Капитан' },
+  { id: 'AWP', icon: Crosshair, role: 'AWP', desc: 'Снайпер' },
+  { id: 'Entry', icon: Target, role: 'Entry', desc: 'Первый вход' },
+  { id: 'Support', icon: Shield, role: 'Support', desc: 'Поддержка' },
+]
+
+const staffRoles = [
+  { id: 'Coach', icon: Headphones, role: 'Coach', desc: 'Тренер' },
+  { id: 'Manager', icon: Briefcase, role: 'Manager', desc: 'Менеджер' },
+]
+
 const RANKS = ['Gold IV и ниже', 'Phoenix', 'Ranger', 'Champion', 'Master', 'Elite', 'Legend']
 
 type Player = {
@@ -23,64 +35,62 @@ type Player = {
   name: string
   avatar: string
   role: string
+  type?: string
   rank_mm?: string
   kd?: number
   hours?: number
   telegram?: string
+  discord?: string
+  experience?: string
+  about?: string
   looking_for_team?: boolean
   online?: boolean
 }
 
-// Форма анкеты
 function PlayerFormModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
   const { user } = useAuth()
+  const [type, setType] = useState<'player' | 'staff'>('player')
   const [role, setRole] = useState('AWP')
-  const [rank, setRank] = useState('Legendary')
+  const [rank, setRank] = useState('Legend')
   const [telegram, setTelegram] = useState(user?.telegram || '')
+  const [discord, setDiscord] = useState('')
   const [kd, setKd] = useState('')
   const [hours, setHours] = useState('')
+  const [experience, setExperience] = useState('')
+  const [about, setAbout] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const gameRoles = roles.filter(r => r.id !== 'all')
+  function handleTypeChange(t: 'player' | 'staff') {
+    setType(t)
+    setRole(t === 'player' ? 'AWP' : 'Coach')
+  }
 
   async function handleSave() {
     if (!user) return
     setLoading(true)
     try {
-      const { error } = await supabase.from('players').upsert({
+      await supabase.from('players').upsert({
         id: user.id,
+        user_id: user.id,
         name: user.name,
         avatar: user.name?.slice(0, 2).toUpperCase(),
+        type,
         role,
-        rank_mm: rank,
+        rank_mm: type === 'player' ? rank : null,
         telegram: telegram.trim() || null,
+        discord: discord.trim() || null,
         kd: kd ? parseFloat(kd) : null,
         hours: hours ? parseInt(hours) : null,
+        experience: experience.trim() || null,
+        about: about.trim() || null,
         looking_for_team: true,
-        user_id: user.id,
       }, { onConflict: 'id' })
 
-      if (error) throw error
       toast.success('Анкета опубликована!', { description: 'Тебя теперь видят все команды' })
       onSaved()
       onClose()
     } catch (e: any) {
-      // Fallback: try users table
-      try {
-        await supabase.from('users').update({
-          role,
-          rank_mm: rank,
-          telegram: telegram.trim() || null,
-          kd: kd ? parseFloat(kd) : null,
-          hours: hours ? parseInt(hours) : null,
-          looking_for_team: true,
-        }).eq('id', user!.id)
-        toast.success('Анкета опубликована!')
-        onSaved()
-        onClose()
-      } catch {
-        toast.error('Ошибка сохранения: ' + (e.message || ''))
-      }
+      toast.error('Ошибка: ' + (e.message || ''))
     } finally {
       setLoading(false)
     }
@@ -95,75 +105,167 @@ function PlayerFormModal({ open, onClose, onSaved }: { open: boolean; onClose: (
     >
       <div className="w-full max-w-md rounded-t-3xl border border-border bg-card sm:rounded-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="font-display text-xl uppercase">Анкета игрока</h2>
+          <h2 className="font-display text-xl uppercase">Анкета</h2>
           <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="space-y-4 p-5">
-          <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Твоя роль *</label>
-            <div className="grid grid-cols-2 gap-2">
-              {gameRoles.map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => setRole(r.id)}
-                  className={`press flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-                    role === r.id
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-card hover:border-primary/40'
-                  }`}
-                >
-                  <r.icon className="h-4 w-4" />
-                  {r.role}
-                  <span className="text-xs text-muted-foreground ml-auto">{r.desc}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ранг *</label>
-            <select
-              value={rank}
-              onChange={e => setRank(e.target.value)}
-              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
+          {/* Player / Staff toggle */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleTypeChange('player')}
+              className={`press flex flex-col items-center gap-1.5 rounded-xl border py-4 transition ${
+                type === 'player'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-card hover:border-primary/40 text-muted-foreground'
+              }`}
             >
-              {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+              <Target className="h-5 w-5" />
+              <span className="font-display text-sm uppercase">Player</span>
+              <span className="text-xs opacity-70">Игровая роль</span>
+            </button>
+            <button
+              onClick={() => handleTypeChange('staff')}
+              className={`press flex flex-col items-center gap-1.5 rounded-xl border py-4 transition ${
+                type === 'staff'
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-card hover:border-primary/40 text-muted-foreground'
+              }`}
+            >
+              <Briefcase className="h-5 w-5" />
+              <span className="font-display text-sm uppercase">Staff</span>
+              <span className="text-xs opacity-70">Тренер / Менеджер</span>
+            </button>
           </div>
 
+          {/* Player fields */}
+          {type === 'player' && (
+            <>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Роль в игре *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {playerRoles.map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setRole(r.id)}
+                      className={`press flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                        role === r.id
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card hover:border-primary/40'
+                      }`}
+                    >
+                      <r.icon className="h-4 w-4" />
+                      <span>{r.role}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">{r.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ранг *</label>
+                <select
+                  value={rank}
+                  onChange={e => setRank(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
+                >
+                  {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">K/D</label>
+                  <input
+                    value={kd}
+                    onChange={e => setKd(e.target.value)}
+                    placeholder="1.25"
+                    type="number"
+                    step="0.01"
+                    className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Часов в игре</label>
+                  <input
+                    value={hours}
+                    onChange={e => setHours(e.target.value)}
+                    placeholder="2000"
+                    type="number"
+                    className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Staff fields */}
+          {type === 'staff' && (
+            <>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Роль *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {staffRoles.map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setRole(r.id)}
+                      className={`press flex items-center gap-2 rounded-xl border px-3 py-3 text-sm font-medium transition ${
+                        role === r.id
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-card hover:border-primary/40'
+                      }`}
+                    >
+                      <r.icon className="h-4 w-4" />
+                      <span>{r.role}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">{r.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Опыт работы</label>
+                <input
+                  value={experience}
+                  onChange={e => setExperience(e.target.value)}
+                  placeholder="2 года тренером в команде X"
+                  className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">О себе</label>
+                <textarea
+                  value={about}
+                  onChange={e => setAbout(e.target.value)}
+                  placeholder="Расскажи о своих навыках..."
+                  rows={3}
+                  className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2.5 text-sm outline-none transition focus:border-primary resize-none"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Common fields */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">K/D</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Telegram</label>
               <input
-                value={kd}
-                onChange={e => setKd(e.target.value)}
-                placeholder="1.25"
-                type="number"
-                step="0.01"
+                value={telegram}
+                onChange={e => setTelegram(e.target.value)}
+                placeholder="@username"
                 className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Часов в игре</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Discord</label>
               <input
-                value={hours}
-                onChange={e => setHours(e.target.value)}
-                placeholder="2000"
-                type="number"
+                value={discord}
+                onChange={e => setDiscord(e.target.value)}
+                placeholder="ник#0000"
                 className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Telegram</label>
-            <input
-              value={telegram}
-              onChange={e => setTelegram(e.target.value)}
-              placeholder="@username"
-              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
-            />
           </div>
 
           <button
@@ -198,20 +300,10 @@ export default function PlayersPage() {
         .order('created_at', { ascending: false })
         .limit(50)
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setPlayers(data.map(p => ({ ...p, online: Math.random() > 0.5 })))
       } else {
-        // fallback to users table
-        const { data: ud } = await supabase
-          .from('users')
-          .select('id, name, avatar, role, rank_mm, kd, hours, telegram')
-          .order('created_at', { ascending: false })
-          .limit(50)
-        if (ud && ud.length > 0) {
-          setPlayers(ud.map(p => ({ ...p, online: Math.random() > 0.5 })))
-        } else {
-          setPlayers([])
-        }
+        setPlayers([])
       }
     } catch {
       setPlayers([])
@@ -247,7 +339,7 @@ export default function PlayersPage() {
       <PageHero
         eyebrow="Игроки"
         title={<>Подбери <span className="text-gradient">тиммейтов</span></>}
-        description="Сотни игроков ищут команду прямо сейчас. Фильтруй по роли, рангу и активности."
+        description="Игроки которые ищут команду прямо сейчас. Фильтруй по роли и активности."
       >
         <button
           onClick={() => isLoggedIn ? setFormOpen(true) : setAuthOpen(true)}
@@ -332,22 +424,37 @@ export default function PlayersPage() {
                   </div>
                   <div>
                     <div className="font-display text-base">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.role} · {p.rank_mm || 'Legendary'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.role}{p.rank_mm ? ` · ${p.rank_mm}` : ''}
+                    </div>
                   </div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-lg bg-muted/60 p-2">
-                    <div className="font-display text-sm text-gradient">{p.kd?.toFixed(2) || '—'}</div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">K/D</div>
+
+                {p.type === 'staff' ? (
+                  <div className="mt-4 space-y-1">
+                    {p.experience && <div className="text-xs text-muted-foreground">📋 {p.experience}</div>}
+                    {p.about && <div className="text-xs text-muted-foreground line-clamp-2">{p.about}</div>}
                   </div>
-                  <div className="rounded-lg bg-muted/60 p-2">
-                    <div className="font-display text-sm">{p.hours ? p.hours + 'h' : '—'}</div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hours</div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-lg bg-muted/60 p-2">
+                      <div className="font-display text-sm text-gradient">{p.kd?.toFixed(2) || '—'}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">K/D</div>
+                    </div>
+                    <div className="rounded-lg bg-muted/60 p-2">
+                      <div className="font-display text-sm">{p.hours ? p.hours + 'h' : '—'}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hours</div>
+                    </div>
                   </div>
-                </div>
-                {p.telegram && (
-                  <div className="mt-2 text-xs text-primary font-medium">✈️ {p.telegram}</div>
                 )}
+
+                {(p.telegram || p.discord) && (
+                  <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                    {p.telegram && <span>✈️ {p.telegram}</span>}
+                    {p.discord && <span>💬 {p.discord}</span>}
+                  </div>
+                )}
+
                 <button
                   onClick={() => handleInvite(p)}
                   className="press mt-4 w-full rounded-lg bg-foreground py-2 text-sm font-semibold text-background transition hover:opacity-90"
