@@ -6,8 +6,6 @@ import { AuthModal } from '../components/AuthModal'
 import { supabase, type Scrim } from '../lib/supabase'
 import { toast } from 'sonner'
 
-// Rank options
-const RANKS = ['Любой', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legendary', 'Mythic I', 'Mythic II', 'Champion']
 const MAPS = ['Sandstone', 'Province', 'Rust', 'Sakura', 'Zone 9', 'Siege']
 const FORMATS = ['5x5 / MR12', '5x5 / MR9', '2x2', '1x1']
 
@@ -18,37 +16,30 @@ const chips = [
   { id: 'mr9', label: 'MR9' },
 ]
 
-// Helper: format date for display
 function formatDateLabel(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   const today = new Date()
   const tomorrow = new Date()
   tomorrow.setDate(today.getDate() + 1)
-
   const hh = date.getHours().toString().padStart(2, '0')
   const mm = date.getMinutes().toString().padStart(2, '0')
   const time = `${hh}:${mm}`
-
   if (date.toDateString() === today.toDateString()) return `Сегодня, ${time}`
   if (date.toDateString() === tomorrow.toDateString()) return `Завтра, ${time}`
-
   const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
   return `${days[date.getDay()]}, ${date.getDate()}.${(date.getMonth() + 1).toString().padStart(2, '0')} ${time}`
 }
 
-// Get min datetime string for input (now)
 function getNowDatetimeLocal(): string {
   const now = new Date()
   now.setSeconds(0, 0)
   return now.toISOString().slice(0, 16)
 }
 
-// Create Scrim Modal
 function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
   const [teamName, setTeamName] = useState('')
-  const [rank, setRank] = useState('Mythic I')
   const [format, setFormat] = useState('5x5 / MR12')
   const [selectedMaps, setSelectedMaps] = useState<string[]>([])
   const [scrimDatetime, setScrimDatetime] = useState('')
@@ -58,10 +49,8 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
   const timeLabel = scrimDatetime ? formatDateLabel(scrimDatetime) : 'Время не указано'
 
-  // Preview
   const preview = {
     team_name: teamName || 'Название команды',
-    rank,
     format,
     maps: selectedMaps.length ? selectedMaps : ['—'],
     time_text: timeLabel,
@@ -81,7 +70,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
       const timeRaw = new Date(scrimDatetime).toISOString()
       const { error } = await supabase.from('scrims').insert({
         team_name: teamName.trim(),
-        rank,
         format,
         maps: selectedMaps,
         time_text: timeLabel,
@@ -95,7 +83,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
       toast.success('Прак создан!', { description: 'Лобби открыто, ждём соперников' })
       onCreated()
       onClose()
-      // reset
       setTeamName(''); setSelectedMaps([]); setScrimDatetime(''); setDiscord(''); setTelegram('')
     } catch (e: any) {
       toast.error('Ошибка создания прака: ' + (e.message || ''))
@@ -117,15 +104,11 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
           <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* Preview */}
         <div className="border-b border-border bg-muted/40 px-5 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Превью карточки</div>
           <div className="rounded-xl border border-primary/20 bg-card p-4">
             <div className="flex items-start justify-between">
-              <div>
-                <div className="font-display text-base uppercase">{preview.team_name}</div>
-                <div className="mt-1 inline-flex rounded-full border border-border bg-muted/60 px-2 py-0.5 text-xs">{preview.rank}</div>
-              </div>
+              <div className="font-display text-base uppercase">{preview.team_name}</div>
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary/15 to-electric/15 font-display text-sm text-primary">
                 {(preview.team_name[0] || 'T').toUpperCase()}
               </div>
@@ -171,17 +154,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ранг</label>
-            <select
-              value={rank}
-              onChange={e => setRank(e.target.value)}
-              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary"
-            >
-              {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-
-          <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Карты</label>
             <div className="flex flex-wrap gap-2">
               {MAPS.map(m => (
@@ -200,7 +172,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
             </div>
           </div>
 
-          {/* DATE + TIME PICKER */}
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Дата и время прака *
@@ -251,7 +222,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   )
 }
 
-// Scrim Card
 function ScrimCard({ scrim, onChallenge, onCancel, isOwner }: {
   scrim: Scrim
   onChallenge: (s: Scrim) => void
@@ -261,12 +231,7 @@ function ScrimCard({ scrim, onChallenge, onCancel, isOwner }: {
   return (
     <div className="group rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-glow animate-fade-in-up">
       <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-display text-lg uppercase tracking-tight">{scrim.team_name}</h3>
-          <div className="mt-1 inline-flex items-center rounded-full border border-border bg-muted/60 px-2 py-0.5 text-xs">
-            {scrim.rank}
-          </div>
-        </div>
+        <h3 className="font-display text-lg uppercase tracking-tight">{scrim.team_name}</h3>
         <div className="flex items-center gap-2">
           {scrim.status === 'pending' && (
             <span className="flex items-center gap-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 text-[10px] font-semibold text-yellow-600">
@@ -320,7 +285,6 @@ function ScrimCard({ scrim, onChallenge, onCancel, isOwner }: {
   )
 }
 
-// Challenge Modal (preview before confirm)
 function ChallengeModal({ scrim, open, onClose, onConfirm }: {
   scrim: Scrim | null; open: boolean; onClose: () => void; onConfirm: () => void
 }) {
@@ -335,7 +299,6 @@ function ChallengeModal({ scrim, open, onClose, onConfirm }: {
         <p className="mt-1 text-sm text-muted-foreground">Ты подаёшь заявку на матч:</p>
         <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4 space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-muted-foreground">Команда</span><span className="font-semibold">{scrim.team_name}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Ранг</span><span>{scrim.rank}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Формат</span><span>{scrim.format}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Время</span><span>{scrim.time_text}</span></div>
         </div>
@@ -372,16 +335,8 @@ export default function PrakiPage() {
         .gt('created_at', cutoff)
         .order('created_at', { ascending: false })
       if (!error && data) setScrims(data)
-    } catch (e) {
-      // Fallback demo data
-      setScrims([
-        { id: '1', team_name: 'VOID Esports', rank: 'Mythic II', format: '5x5 / MR12', maps: ['Sandstone', 'Province'], time_text: 'Сегодня, 21:00', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-        { id: '2', team_name: 'NorthFrame', rank: 'Legendary', format: '5x5 / MR12', maps: ['Rust', 'Sakura'], time_text: 'Сегодня, 22:30', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-        { id: '3', team_name: 'Polar Wolves', rank: 'Mythic I', format: '5x5 / MR9', maps: ['Zone 9'], time_text: 'Завтра, 19:00', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-        { id: '4', team_name: 'Echo.GG', rank: 'Champion', format: '5x5 / MR12', maps: ['Sandstone', 'Rust'], time_text: 'Завтра, 20:00', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-        { id: '5', team_name: 'Blue Phoenix', rank: 'Mythic II', format: '5x5 / MR12', maps: ['Province'], time_text: 'Пт, 21:30', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-        { id: '6', team_name: 'Static Wave', rank: 'Legendary', format: '5x5 / MR9', maps: ['Sakura', 'Rust'], time_text: 'Сб, 18:00', status: 'open', user_id: 'demo', created_at: new Date().toISOString() },
-      ])
+    } catch {
+      setScrims([])
     } finally {
       setLoading(false)
     }
@@ -444,7 +399,7 @@ export default function PrakiPage() {
       <PageHero
         eyebrow="Праки"
         title={<>Найди матч <span className="text-gradient">за минуту</span></>}
-        description="Открытые лобби по Standoff 2. Фильтруй по рангу, формату, картам и времени — присоединяйся в один клик."
+        description="Открытые лобби по Standoff 2. Фильтруй по формату, картам и времени — присоединяйся в один клик."
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
