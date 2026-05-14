@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Swords, Users, Search, Trophy, ArrowRight, Zap, Shield, Target } from 'lucide-react'
 import { PageShell, CountUp } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
+import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 
 // ─── LIVE TICKER ─────────────────────────────────────────────────────────────
@@ -95,6 +96,27 @@ function QuickQueue() {
 export default function HomePage() {
   const { isLoggedIn } = useAuth()
   const [authOpen, setAuthOpen] = useState(false)
+  const [stats, setStats] = useState({ players: 0, teams: 0, tournaments: 0 })
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const [playersRes, teamsRes, tournamentsRes] = await Promise.all([
+          supabase.from('users').select('id', { count: 'exact', head: true }),
+          supabase.from('teams').select('id', { count: 'exact', head: true }),
+          supabase.from('tournaments').select('id', { count: 'exact', head: true }),
+        ])
+        setStats({
+          players: playersRes.count || 0,
+          teams: teamsRes.count || 0,
+          tournaments: tournamentsRes.count || 0,
+        })
+      } catch {
+        // keep zeros
+      }
+    }
+    loadStats()
+  }, [])
 
   return (
     <PageShell>
@@ -159,12 +181,12 @@ export default function HomePage() {
 
             <QuickQueue />
 
-            {/* Stats */}
+            {/* Stats — реальные данные из Supabase */}
             <div className="mx-auto mt-14 grid max-w-3xl grid-cols-3 gap-3 md:gap-6">
               {[
-                { v: 12000, suffix: '+', l: 'Игроков' },
-                { v: 1800, suffix: '', l: 'Команд' },
-                { v: 240, suffix: '', l: 'Турниров' },
+                { v: stats.players, suffix: '', l: 'Игроков' },
+                { v: stats.teams, suffix: '', l: 'Команд' },
+                { v: stats.tournaments, suffix: '', l: 'Турниров' },
               ].map((s, i) => (
                 <div
                   key={s.l}
