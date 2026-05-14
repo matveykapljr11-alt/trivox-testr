@@ -1,27 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Calendar, Trophy, Users, Coins, ArrowRight, Plus, X, Pencil, Trash2 } from 'lucide-react'
+import { Trophy, Plus, X, Pencil, Trash2 } from 'lucide-react'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
 import { supabase, type Tournament } from '../lib/supabase'
 import { toast } from 'sonner'
-
-// Countdown hook
-function useCountdown(target: number) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-  const diff = Math.max(0, target - now)
-  const d = Math.floor(diff / 86400000)
-  const h = Math.floor((diff % 86400000) / 3600000)
-  const m = Math.floor((diff % 3600000) / 60000)
-  const s = Math.floor((diff % 60000) / 1000)
-  return { d, h, m, s }
-}
-
-const FEATURED_START = Date.now() + 1000 * 60 * 60 * 36
 
 const DEMO_TOURNAMENTS: Tournament[] = [
   { id: '1', title: 'Standoff 2 Weekly', description: 'Еженедельный кубок', format: '5x5 MR12', prize: '₽ 15 000', date_text: 'Каждую субботу', status: 'upcoming', max_teams: 64, level: 'Open', organizer_id: 'demo', created_at: '' },
@@ -32,7 +15,6 @@ const DEMO_TOURNAMENTS: Tournament[] = [
   { id: '6', title: 'Region Clash CIS', description: 'Региональный', format: '5x5 MR12', prize: '₽ 50 000', date_text: '5—7 июля', status: 'finished', max_teams: 64, level: 'Open', organizer_id: 'demo', created_at: '' },
 ]
 
-// Create/Edit Tournament Modal
 function TournamentModal({ open, onClose, onSaved, editTournament }: {
   open: boolean; onClose: () => void; onSaved: () => void; editTournament?: Tournament | null
 }) {
@@ -169,7 +151,6 @@ export default function TournamentsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editTournament, setEditTournament] = useState<Tournament | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
-  const cd = useCountdown(FEATURED_START)
 
   async function loadTournaments() {
     setLoading(true)
@@ -194,7 +175,6 @@ export default function TournamentsPage() {
   async function handleRegister(tournament: Tournament) {
     if (!isLoggedIn) { setAuthOpen(true); return }
 
-    // Check if user has a team
     const { data: team } = await supabase
       .from('teams')
       .select('id')
@@ -206,7 +186,6 @@ export default function TournamentsPage() {
       return
     }
 
-    // Check team member count
     const { data: members } = await supabase
       .from('team_members')
       .select('id')
@@ -221,7 +200,6 @@ export default function TournamentsPage() {
       return
     }
 
-    // Check if already registered
     const { data: existing } = await supabase
       .from('tournament_teams')
       .select('id')
@@ -267,41 +245,8 @@ export default function TournamentsPage() {
       />
 
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
-        {/* Featured banner */}
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary to-electric p-8 text-primary-foreground shadow-glow md:p-12 animate-fade-in-up">
-          <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/15 blur-3xl animate-float" />
-          <div className="absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-deep/30 blur-3xl" />
-          <div className="relative grid gap-6 md:grid-cols-[2fr_1fr] md:items-end">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
-                <Trophy className="h-3.5 w-3.5" /> Главный турнир сезона
-              </div>
-              <h2 className="mt-3 text-4xl uppercase md:text-6xl">TRIVOX Open Cup #4</h2>
-              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-primary-foreground/90">
-                <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /> 12—21 июня</div>
-                <div className="flex items-center gap-2"><Coins className="h-4 w-4" /> ₽ 250 000</div>
-                <div className="flex items-center gap-2"><Users className="h-4 w-4" /> 128 команд</div>
-              </div>
-              <div className="mt-6 grid max-w-sm grid-cols-4 gap-2">
-                {[{ v: cd.d, l: 'Дни' }, { v: cd.h, l: 'Часы' }, { v: cd.m, l: 'Мин' }, { v: cd.s, l: 'Сек' }].map(c => (
-                  <div key={c.l} className="rounded-lg bg-white/15 px-2 py-3 text-center backdrop-blur">
-                    <div className="font-display text-2xl tabular-nums">{String(c.v).padStart(2, '0')}</div>
-                    <div className="text-[10px] uppercase tracking-wider opacity-80">{c.l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => isLoggedIn ? handleRegister({ id: 'featured', title: 'TRIVOX Open Cup #4', format: '5x5 MR12', status: 'upcoming', max_teams: 128, organizer_id: 'trivox', created_at: '' }) : setAuthOpen(true)}
-              className="press inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-background px-6 text-sm font-semibold text-foreground transition hover:opacity-90"
-            >
-              Зарегистрировать команду <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
         {/* Tabs + Create button */}
-        <div className="mt-10 flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
@@ -321,7 +266,7 @@ export default function TournamentsPage() {
         </div>
 
         {/* List */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-64 rounded-2xl skeleton" />)
           ) : filtered.length === 0 ? (
