@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Trophy, Users, MapPin, ArrowUpDown, Plus, X, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
@@ -114,38 +115,44 @@ function TeamCard({ team, memberCount, onJoin, canJoin }: {
 }) {
   const initials = team.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const isOpen = team.status?.toLowerCase().includes('набор') || team.status?.toLowerCase().includes('ищут')
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-glow animate-fade-in-up">
-      <div className="flex items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-electric font-display text-primary-foreground shadow-soft text-sm">
-          {initials}
-        </div>
-        <div>
-          <h3 className="font-display text-base uppercase">{team.name}</h3>
-          <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <MapPin className="h-3 w-3" /> {team.region} · <span className="font-mono text-[10px]">[{team.tag}]</span>
+      {/* Clickable header */}
+      <Link to={`/teams/${team.id}`} className="block">
+        <div className="flex items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary to-electric font-display text-primary-foreground shadow-soft text-sm">
+            {initials}
+          </div>
+          <div>
+            <h3 className="font-display text-base uppercase hover:text-primary transition">{team.name}</h3>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> {team.region} · <span className="font-mono text-[10px]">[{team.tag}]</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-muted/60 p-2">
-          <div className="font-display text-sm">{team.rating || 1000}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Rating</div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-muted/60 p-2">
+            <div className="font-display text-sm">{team.rating || 1000}</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Rating</div>
+          </div>
+          <div className="rounded-lg bg-muted/60 p-2">
+            <div className="font-display text-sm">{memberCount}</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Players</div>
+          </div>
+          <div className="rounded-lg bg-muted/60 p-2">
+            <div className="font-display text-sm">{team.wins || 0}</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</div>
+          </div>
         </div>
-        <div className="rounded-lg bg-muted/60 p-2">
-          <div className="font-display text-sm">{memberCount}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Players</div>
+        <div className={`mt-4 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+          isOpen ? 'border border-primary/30 bg-primary/10 text-primary' : 'border border-border bg-muted text-muted-foreground'
+        }`}>
+          <Users className="h-3 w-3" /> {team.status}
         </div>
-        <div className="rounded-lg bg-muted/60 p-2">
-          <div className="font-display text-sm">{team.wins || 0}</div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</div>
-        </div>
-      </div>
-      <div className={`mt-4 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-        isOpen ? 'border border-primary/30 bg-primary/10 text-primary' : 'border border-border bg-muted text-muted-foreground'
-      }`}>
-        <Users className="h-3 w-3" /> {team.status}
-      </div>
+      </Link>
+
+      {/* Join button — separate from link */}
       {canJoin && isOpen ? (
         <button onClick={() => onJoin(team)}
           className="press mt-4 w-full rounded-lg bg-foreground py-2 text-sm font-semibold text-background transition hover:opacity-90">
@@ -190,7 +197,6 @@ export default function TeamsPage() {
       if (!error && data && data.length > 0) {
         setTeams(data)
 
-        // Load member counts for all teams
         const { data: members } = await supabase
           .from('team_members')
           .select('team_id')
@@ -224,6 +230,7 @@ export default function TeamsPage() {
   }, [teams, tab, sort, q])
 
   async function handleJoin(team: Team) {
+    if (!isLoggedIn) { setAuthOpen(true); return }
     if (!user) return
     try {
       await supabase.from('join_requests').insert({
