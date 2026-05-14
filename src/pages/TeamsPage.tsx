@@ -172,7 +172,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [memberCounts, setMemberCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState('open')
   const [sort, setSort] = useState<'rating' | 'wins'>('rating')
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
