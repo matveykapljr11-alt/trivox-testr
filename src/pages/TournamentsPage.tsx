@@ -193,15 +193,57 @@ export default function TournamentsPage() {
 
   async function handleRegister(tournament: Tournament) {
     if (!isLoggedIn) { setAuthOpen(true); return }
+
+    // Check if user has a team
+    const { data: team } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('owner_id', user!.id)
+      .single()
+
+    if (!team) {
+      toast.error('У тебя нет команды', { description: 'Создай команду перед регистрацией на турнир' })
+      return
+    }
+
+    // Check team member count
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('team_id', team.id)
+
+    const memberCount = members?.length || 0
+
+    if (memberCount < 4) {
+      toast.error('Недостаточно игроков', {
+        description: `В команде ${memberCount} из минимум 4 игроков. Добери состав перед регистрацией.`
+      })
+      return
+    }
+
+    // Check if already registered
+    const { data: existing } = await supabase
+      .from('tournament_teams')
+      .select('id')
+      .eq('tournament_id', tournament.id)
+      .eq('team_id', team.id)
+      .single()
+
+    if (existing) {
+      toast.error('Команда уже зарегистрирована на этот турнир')
+      return
+    }
+
     try {
       await supabase.from('tournament_teams').insert({
         tournament_id: tournament.id,
+        team_id: team.id,
         user_id: user!.id,
         status: 'registered',
       })
       toast.success('Команда зарегистрирована!', { description: tournament.title })
-    } catch {
-      toast.success('Команда зарегистрирована!', { description: tournament.title })
+    } catch (e: any) {
+      toast.error('Ошибка регистрации: ' + (e.message || ''))
     }
   }
 
@@ -250,7 +292,7 @@ export default function TournamentsPage() {
               </div>
             </div>
             <button
-              onClick={() => isLoggedIn ? toast.success('Команда зарегистрирована', { description: 'TRIVOX Open Cup #4' }) : setAuthOpen(true)}
+              onClick={() => isLoggedIn ? handleRegister({ id: 'featured', title: 'TRIVOX Open Cup #4', format: '5x5 MR12', status: 'upcoming', max_teams: 128, organizer_id: 'trivox', created_at: '' }) : setAuthOpen(true)}
               className="press inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-background px-6 text-sm font-semibold text-foreground transition hover:opacity-90"
             >
               Зарегистрировать команду <ArrowRight className="h-4 w-4" />
