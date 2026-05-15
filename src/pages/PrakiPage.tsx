@@ -40,12 +40,36 @@ function getNowDatetimeLocal(): string {
 function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
   const [teamName, setTeamName] = useState('')
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [hasTeam, setHasTeam] = useState(true)
   const [format, setFormat] = useState('5x5 / MR12')
   const [selectedMaps, setSelectedMaps] = useState<string[]>([])
   const [scrimDatetime, setScrimDatetime] = useState('')
   const [discord, setDiscord] = useState('')
   const [telegram, setTelegram] = useState(user?.telegram || '')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !user) return
+    setTeamLoading(true)
+    supabase
+      .from('teams')
+      .select('name, discord, telegram')
+      .eq('owner_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setTeamName(data.name)
+          setHasTeam(true)
+          if (data.discord) setDiscord(data.discord)
+          if (data.telegram) setTelegram(data.telegram)
+        } else {
+          setHasTeam(false)
+          setTeamName('')
+        }
+        setTeamLoading(false)
+      })
+  }, [open, user])
 
   const timeLabel = scrimDatetime ? formatDateLabel(scrimDatetime) : 'Время не указано'
 
@@ -61,6 +85,10 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   }
 
   async function handleCreate() {
+    if (!hasTeam) {
+      toast.error('Сначала создай команду', { description: 'Перейди на страницу Команды' })
+      return
+    }
     if (!teamName.trim()) { toast.error('Укажи название команды'); return }
     if (!scrimDatetime) { toast.error('Укажи дату и время прака'); return }
     if (!user) return
@@ -83,7 +111,7 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
       toast.success('Прак создан!', { description: 'Лобби открыто, ждём соперников' })
       onCreated()
       onClose()
-      setTeamName(''); setSelectedMaps([]); setScrimDatetime(''); setDiscord(''); setTelegram('')
+      setSelectedMaps([]); setScrimDatetime('')
     } catch (e: any) {
       toast.error('Ошибка создания прака: ' + (e.message || ''))
     } finally {
@@ -103,6 +131,12 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
           <h2 className="font-display text-xl uppercase">Создать прак</h2>
           <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
+
+        {!hasTeam && !teamLoading && (
+          <div className="mx-5 mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-700">
+            ⚠️ У тебя нет команды. <a href="/teams" className="font-semibold underline">Создай команду</a> перед публикацией прака.
+          </div>
+        )}
 
         <div className="border-b border-border bg-muted/40 px-5 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Превью карточки</div>
@@ -127,12 +161,13 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
         <div className="space-y-4 p-5">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Название команды *</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Название команды</label>
             <input
-              value={teamName}
+              value={teamLoading ? 'Загружаем...' : teamName}
               onChange={e => setTeamName(e.target.value)}
               placeholder="Твоя команда"
-              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              disabled={teamLoading}
+              className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
           </div>
 
@@ -211,10 +246,10 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
           <button
             onClick={handleCreate}
-            disabled={loading}
+            disabled={loading || !hasTeam || teamLoading}
             className="press mt-2 h-12 w-full rounded-xl bg-gradient-to-r from-primary to-electric text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-60"
           >
-            {loading ? 'Создаём...' : 'Опубликовать прак'}
+            {loading ? 'Создаём...' : !hasTeam ? 'Сначала создай команду' : 'Опубликовать прак'}
           </button>
         </div>
       </div>
