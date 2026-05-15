@@ -3,9 +3,8 @@ import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Navigate } from 'react-router-dom'
-import { Users, Calendar, Plus, Trophy, Swords } from 'lucide-react'
+import { Users, Calendar, Plus, Trophy, Swords, X, Clock, Map, MessageCircle, Send } from 'lucide-react'
 
-// Generate next 7 days starting from today
 function getDays() {
   const days = []
   const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
@@ -26,6 +25,183 @@ function isSameDay(a: Date, b: Date) {
     a.getDate() === b.getDate()
 }
 
+function ScrimDetailModal({ scrim, open, onClose }: { scrim: any; open: boolean; onClose: () => void }) {
+  if (!open || !scrim) return null
+  const time = scrim.time_raw
+    ? new Date(scrim.time_raw).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })
+    : scrim.time_text
+  const date = scrim.time_raw
+    ? new Date(scrim.time_raw).toLocaleDateString('ru', { day: 'numeric', month: 'long' })
+    : ''
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-md rounded-t-3xl border border-border bg-card sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Swords className="h-5 w-5 text-primary" />
+            <h2 className="font-display text-xl uppercase">Детали прака</h2>
+          </div>
+          <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Team name */}
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="font-display text-2xl uppercase">{scrim.team_name}</div>
+            <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              scrim.status === 'confirmed' ? 'bg-green-500/10 text-green-600 border border-green-500/20' :
+              scrim.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600 border border-yellow-500/20' :
+              'bg-primary/10 text-primary border border-primary/20'
+            }`}>
+              {scrim.status === 'confirmed' ? '✓ Подтверждён' : scrim.status === 'pending' ? '⏳ Ожидает' : '🟢 Открыт'}
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Время</div>
+                <div className="font-semibold text-sm">{date} в {time}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <Users className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider">Формат</div>
+                <div className="font-semibold text-sm">{scrim.format}</div>
+              </div>
+            </div>
+
+            {scrim.maps?.length > 0 && (
+              <div className="flex items-start gap-3 rounded-xl border border-border p-3">
+                <Map className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Карты</div>
+                  <div className="flex flex-wrap gap-1">
+                    {scrim.maps.map((map: string) => (
+                      <span key={map} className="rounded-md bg-accent/60 px-2 py-0.5 text-xs font-medium">{map}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {scrim.discord && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <MessageCircle className="h-5 w-5 text-[#5865F2] flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Discord</div>
+                  <div className="font-semibold text-sm">{scrim.discord}</div>
+                </div>
+              </div>
+            )}
+
+            {scrim.telegram && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Send className="h-5 w-5 text-[#29B6F6] flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Telegram</div>
+                  <div className="font-semibold text-sm">{scrim.telegram}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="press w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TournamentDetailModal({ tour, open, onClose }: { tour: any; open: boolean; onClose: () => void }) {
+  if (!open || !tour) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-md rounded-t-3xl border border-border bg-card sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-yellow-500" />
+            <h2 className="font-display text-xl uppercase">Детали турнира</h2>
+          </div>
+          <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl border border-border bg-muted/40 p-4">
+            <div className="font-display text-2xl uppercase">{tour.name || tour.title}</div>
+            {tour.description && <div className="mt-1 text-sm text-muted-foreground">{tour.description}</div>}
+          </div>
+
+          <div className="space-y-3">
+            {tour.start_date && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Дата</div>
+                  <div className="font-semibold text-sm">{tour.start_date} {tour.start_time ? `· ${tour.start_time}` : ''}</div>
+                </div>
+              </div>
+            )}
+
+            {tour.format && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Users className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Формат</div>
+                  <div className="font-semibold text-sm">{tour.format}</div>
+                </div>
+              </div>
+            )}
+
+            {tour.prize && tour.prize !== 'No prize' && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Trophy className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Призовой фонд</div>
+                  <div className="font-semibold text-sm text-gradient">{tour.prize}</div>
+                </div>
+              </div>
+            )}
+
+            {tour.organizer && (
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Users className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Организатор</div>
+                  <div className="font-semibold text-sm">{tour.organizer}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="press w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MyTeamPage() {
   const { user, isLoggedIn } = useAuth()
   const [team, setTeam] = useState<any>(null)
@@ -34,13 +210,14 @@ export default function MyTeamPage() {
   const [tournaments, setTournaments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
+  const [selectedScrim, setSelectedScrim] = useState<any>(null)
+  const [selectedTour, setSelectedTour] = useState<any>(null)
 
   useEffect(() => {
     if (!user) return
     async function load() {
       setLoading(true)
       try {
-        // Load team
         const { data: myTeam } = await supabase
           .from('teams')
           .select('*')
@@ -50,14 +227,13 @@ export default function MyTeamPage() {
         if (myTeam) {
           setTeam(myTeam)
 
-          // Load members
           const { data: m } = await supabase
             .from('team_members')
             .select('*')
             .eq('team_id', myTeam.id)
           setMembers(m || [])
 
-          // Load scrims for this team (by team name or user_id)
+          // Load own scrims + confirmed scrims where opponent
           const { data: s } = await supabase
             .from('scrims')
             .select('*')
@@ -65,7 +241,6 @@ export default function MyTeamPage() {
             .neq('status', 'cancelled')
           setScrims(s || [])
 
-          // Load tournaments where team is registered
           const { data: tt } = await supabase
             .from('tournament_teams')
             .select('tournament_id')
@@ -93,24 +268,18 @@ export default function MyTeamPage() {
   const selectedDate = DAYS[selectedDay].date
   const dateStr = selectedDate.toLocaleDateString('ru', { day: 'numeric', month: 'long' })
 
-  // Get scrims for selected day using time_raw
   const dayScrimEvents = scrims.filter(s => {
     if (!s.time_raw) return false
-    const d = new Date(s.time_raw)
-    return isSameDay(d, selectedDate)
+    return isSameDay(new Date(s.time_raw), selectedDate)
   })
 
-  // Get tournaments for selected day using start_date
   const dayTournamentEvents = tournaments.filter(t => {
     if (!t.start_date) return false
-    // start_date is "2026-04-30" format
-    const d = new Date(t.start_date + 'T00:00:00')
-    return isSameDay(d, selectedDate)
+    return isSameDay(new Date(t.start_date + 'T00:00:00'), selectedDate)
   })
 
   const totalEvents = dayScrimEvents.length + dayTournamentEvents.length
 
-  // Check which days have events (for dot indicators)
   function dayHasEvents(date: Date) {
     const hasScrim = scrims.some(s => s.time_raw && isSameDay(new Date(s.time_raw), date))
     const hasTour = tournaments.some(t => t.start_date && isSameDay(new Date(t.start_date + 'T00:00:00'), date))
@@ -158,7 +327,6 @@ export default function MyTeamPage() {
                 <Calendar className="h-5 w-5 text-primary" /> Расписание
               </h3>
 
-              {/* Day picker */}
               <div className="flex gap-2 overflow-x-auto pb-2">
                 {DAYS.map((d, i) => (
                   <button
@@ -172,7 +340,6 @@ export default function MyTeamPage() {
                   >
                     <span className="text-xs font-semibold uppercase">{d.label}</span>
                     <span className="font-display text-lg">{d.date.getDate()}</span>
-                    {/* Event dot indicator */}
                     {dayHasEvents(d.date) && (
                       <span className={`absolute bottom-1.5 h-1.5 w-1.5 rounded-full ${
                         selectedDay === i ? 'bg-primary-foreground' : 'bg-primary'
@@ -182,7 +349,6 @@ export default function MyTeamPage() {
                 ))}
               </div>
 
-              {/* Events for selected day */}
               <div className="mt-4">
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   {dateStr} · {totalEvents > 0 ? `${totalEvents} событий` : 'нет событий'}
@@ -200,13 +366,16 @@ export default function MyTeamPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Scrims */}
                     {dayScrimEvents.map(scrim => {
                       const time = scrim.time_raw
                         ? new Date(scrim.time_raw).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })
                         : scrim.time_text
                       return (
-                        <div key={scrim.id} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                        <button
+                          key={scrim.id}
+                          onClick={() => setSelectedScrim(scrim)}
+                          className="w-full flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4 hover:border-primary/40 hover:bg-muted/50 transition text-left"
+                        >
                           <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-primary/10">
                             <Swords className="h-5 w-5 text-primary" />
                           </div>
@@ -218,22 +387,25 @@ export default function MyTeamPage() {
                               <span className="text-xs text-muted-foreground">{time}</span>
                             </div>
                             <div className="mt-0.5 font-semibold text-sm truncate">{scrim.team_name}</div>
-                            <div className="text-xs text-muted-foreground">{scrim.format} · {scrim.rank}</div>
+                            <div className="text-xs text-muted-foreground">{scrim.format}</div>
                           </div>
-                          <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            scrim.status === 'open' ? 'bg-green-500/10 text-green-600' :
+                          <div className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
+                            scrim.status === 'confirmed' ? 'bg-green-500/10 text-green-600' :
                             scrim.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600' :
-                            'bg-muted text-muted-foreground'
+                            'bg-primary/10 text-primary'
                           }`}>
-                            {scrim.status === 'open' ? 'Открыт' : scrim.status === 'pending' ? 'Ждём' : scrim.status}
+                            {scrim.status === 'confirmed' ? 'Подтверждён' : scrim.status === 'pending' ? 'Ждём' : 'Открыт'}
                           </div>
-                        </div>
+                        </button>
                       )
                     })}
 
-                    {/* Tournaments */}
                     {dayTournamentEvents.map(tour => (
-                      <div key={tour.id} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4">
+                      <button
+                        key={tour.id}
+                        onClick={() => setSelectedTour(tour)}
+                        className="w-full flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-4 hover:border-yellow-500/40 hover:bg-muted/50 transition text-left"
+                      >
                         <div className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-yellow-500/10">
                           <Trophy className="h-5 w-5 text-yellow-500" />
                         </div>
@@ -246,19 +418,19 @@ export default function MyTeamPage() {
                               <span className="text-xs text-muted-foreground">{tour.start_time}</span>
                             )}
                           </div>
-                          <div className="mt-0.5 font-semibold text-sm truncate">{tour.name}</div>
+                          <div className="mt-0.5 font-semibold text-sm truncate">{tour.name || tour.title}</div>
                           <div className="text-xs text-muted-foreground">
                             {tour.format}{tour.prize && tour.prize !== 'No prize' ? ` · 🏆 ${tour.prize}` : ''}
                           </div>
                         </div>
-                        <div className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        <div className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${
                           tour.status === 'open' ? 'bg-green-500/10 text-green-600' :
                           tour.status === 'upcoming' ? 'bg-blue-500/10 text-blue-600' :
                           'bg-muted text-muted-foreground'
                         }`}>
                           {tour.status === 'open' ? 'Открыт' : tour.status === 'upcoming' ? 'Скоро' : tour.status}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -294,6 +466,9 @@ export default function MyTeamPage() {
           </div>
         )}
       </section>
+
+      <ScrimDetailModal scrim={selectedScrim} open={!!selectedScrim} onClose={() => setSelectedScrim(null)} />
+      <TournamentDetailModal tour={selectedTour} open={!!selectedTour} onClose={() => setSelectedTour(null)} />
     </PageShell>
   )
 }
