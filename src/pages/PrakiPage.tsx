@@ -253,7 +253,7 @@ function ScrimCard({ scrim, onChallenge, onCancel, isOwner }: {
         <div className="flex items-center gap-2 text-muted-foreground"><Clock className="h-4 w-4" /> {scrim.time_text}</div>
         {scrim.telegram && (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="text-sm">✈️</span>
+            <span className="text-xs text-muted-foreground font-semibold">TG:</span>
             <span className="text-primary font-medium text-xs">{scrim.telegram}</span>
           </div>
         )}
