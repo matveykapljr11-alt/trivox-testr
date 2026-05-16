@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Trophy, Plus, X, Pencil, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
@@ -172,59 +173,6 @@ export default function TournamentsPage() {
 
   const filtered = useMemo(() => tournaments.filter(t => t.status === tab), [tournaments, tab])
 
-  async function handleRegister(tournament: Tournament) {
-    if (!isLoggedIn) { setAuthOpen(true); return }
-
-    const { data: team } = await supabase
-      .from('teams')
-      .select('id')
-      .eq('owner_id', user!.id)
-      .single()
-
-    if (!team) {
-      toast.error('У тебя нет команды', { description: 'Создай команду перед регистрацией на турнир' })
-      return
-    }
-
-    const { data: members } = await supabase
-      .from('team_members')
-      .select('id')
-      .eq('team_id', team.id)
-
-    const memberCount = members?.length || 0
-
-    if (memberCount < 4) {
-      toast.error('Недостаточно игроков', {
-        description: `В команде ${memberCount} из минимум 4 игроков. Добери состав перед регистрацией.`
-      })
-      return
-    }
-
-    const { data: existing } = await supabase
-      .from('tournament_teams')
-      .select('id')
-      .eq('tournament_id', tournament.id)
-      .eq('team_id', team.id)
-      .single()
-
-    if (existing) {
-      toast.error('Команда уже зарегистрирована на этот турнир')
-      return
-    }
-
-    try {
-      await supabase.from('tournament_teams').insert({
-        tournament_id: tournament.id,
-        team_id: team.id,
-        user_id: user!.id,
-        status: 'registered',
-      })
-      toast.success('Команда зарегистрирована!', { description: tournament.title })
-    } catch (e: any) {
-      toast.error('Ошибка регистрации: ' + (e.message || ''))
-    }
-  }
-
   async function handleDelete(tournament: Tournament) {
     if (!confirm('Удалить турнир?')) return
     try {
@@ -245,7 +193,6 @@ export default function TournamentsPage() {
       />
 
       <section className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
-        {/* Tabs + Create button */}
         <div className="flex items-center justify-between mb-6">
           <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1">
             {tabs.map(t => (
@@ -265,7 +212,6 @@ export default function TournamentsPage() {
           </button>
         </div>
 
-        {/* List */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-64 rounded-2xl skeleton" />)
@@ -275,6 +221,7 @@ export default function TournamentsPage() {
             </div>
           ) : filtered.map((t, i) => {
             const isOrganizer = user?.id === t.organizer_id
+            const isDemoId = ['1','2','3','4','5','6'].includes(t.id)
             return (
               <div
                 key={t.id}
@@ -286,7 +233,7 @@ export default function TournamentsPage() {
                     {t.description || t.format}
                   </span>
                   <div className="flex items-center gap-1">
-                    {isOrganizer && t.id !== 'demo' && (
+                    {isOrganizer && !isDemoId && (
                       <>
                         <button onClick={() => setEditTournament(t)} className="press rounded-lg p-1.5 hover:bg-muted">
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -299,19 +246,47 @@ export default function TournamentsPage() {
                     <Trophy className="h-5 w-5 text-primary transition-transform group-hover:rotate-12" />
                   </div>
                 </div>
-                <h3 className="mt-3 font-display text-xl uppercase">{t.title}</h3>
+
+                <Link to={isDemoId ? '/tournaments' : `/tournaments/${t.id}`}>
+                  <h3 className="mt-3 font-display text-xl uppercase hover:text-primary transition">{t.title}</h3>
+                </Link>
+
                 <dl className="mt-4 space-y-2 text-sm flex-1">
                   {t.date_text && <div className="flex justify-between"><dt className="text-muted-foreground">Дата</dt><dd>{t.date_text}</dd></div>}
                   {t.prize && <div className="flex justify-between"><dt className="text-muted-foreground">Призовой</dt><dd className="font-semibold text-gradient">{t.prize}</dd></div>}
                   <div className="flex justify-between"><dt className="text-muted-foreground">Уровень</dt><dd>{t.level || 'Open'}</dd></div>
                   <div className="flex justify-between"><dt className="text-muted-foreground">Формат</dt><dd>{t.format}</dd></div>
                 </dl>
-                <button
-                  onClick={() => t.status === 'upcoming' ? handleRegister(t) : toast(`${t.title}`)}
-                  className="press mt-5 rounded-lg border border-border py-2 text-sm font-semibold transition hover:bg-muted"
-                >
-                  {t.status === 'upcoming' ? 'Зарегистрироваться' : t.status === 'live' ? 'Смотреть' : 'Результаты'}
-                </button>
+
+                <div className="mt-5 flex gap-2">
+                  {!isDemoId && (
+                    <Link
+                      to={`/tournaments/${t.id}`}
+                      className="press flex-1 rounded-lg bg-gradient-to-r from-primary to-electric py-2 text-sm font-semibold text-primary-foreground text-center hover:opacity-90 transition"
+                    >
+                      {t.status === 'upcoming' ? 'Зарегистрироваться' : t.status === 'live' ? 'Подробнее' : 'Результаты'}
+                    </Link>
+                  )}
+                  {isDemoId && (
+                    <button
+                      className="press flex-1 rounded-lg border border-border py-2 text-sm font-semibold hover:bg-muted transition"
+                    >
+                      {t.status === 'upcoming' ? 'Скоро' : t.status === 'live' ? 'Смотреть' : 'Результаты'}
+                    </button>
+                  )}
+                  {!isDemoId && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/tournaments/${t.id}`)
+                        toast.success('Ссылка скопирована!')
+                      }}
+                      className="press rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition"
+                      title="Скопировать ссылку"
+                    >
+                      📋
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}
