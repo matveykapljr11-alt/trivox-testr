@@ -8,6 +8,7 @@ import TeamsPage from './pages/TeamsPage'
 import TeamProfilePage from './pages/TeamProfilePage'
 import PlayersPage from './pages/PlayersPage'
 import TournamentsPage from './pages/TournamentsPage'
+import TournamentProfilePage from './pages/TournamentProfilePage'
 import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 import MyTeamPage from './pages/MyTeamPage'
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/teams/:id" element={<TeamProfilePage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
+          <Route path="/tournaments/:id" element={<TournamentProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-team" element={<MyTeamPage />} />
           <Route path="*" element={<NotFoundPage />} />
