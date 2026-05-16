@@ -1,0 +1,319 @@
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Trophy, Users, Calendar, Coins, ArrowLeft, MapPin, Shield, Clock } from 'lucide-react'
+import { PageShell } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
+import { AuthModal } from '../components/AuthModal'
+import { supabase } from '../lib/supabase'
+import { toast } from 'sonner'
+
+export default function TournamentProfilePage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { user, isLoggedIn } = useAuth()
+  const [tournament, setTournament] = useState<any>(null)
+  const [registeredTeams, setRegisteredTeams] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [registering, setRegistering] = useState(false)
+  const [isRegistered, setIsRegistered] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    async function load() {
+      setLoading(true)
+      try {
+        const { data: tour } = await supabase
+          .from('tournaments')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (tour) {
+          setTournament(tour)
+
+          // Load registered teams
+          const { data: tt } = await supabase
+            .from('tournament_teams')
+            .select('*, teams(name, tag, region)')
+            .eq('tournament_id', id)
+
+          setRegisteredTeams(tt || [])
+
+          // Check if user's team is registered
+          if (user) {
+            const { data: myTeam } = await supabase
+              .from('teams')
+              .select('id')
+              .eq('owner_id', user.id)
+              .single()
+
+            if (myTeam) {
+              const already = (tt || []).some((t: any) => t.team_id === myTeam.id)
+              setIsRegistered(already)
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id, user])
+
+  async function handleRegister() {
+    if (!isLoggedIn) { setAuthOpen(true); return }
+    if (!user) return
+
+    setRegistering(true)
+    try {
+      // Get user's team
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('owner_id', user.id)
+        .single()
+
+      if (!team) {
+        toast.error('У тебя нет команды', { description: 'Создай команду перед регистрацией' })
+        setRegistering(false)
+        return
+      }
+
+      // Check member count
+      const { data: members } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', team.id)
+
+      if ((members?.length || 0) < 4) {
+        toast.error('Недостаточно игроков', {
+          description: `В команде ${members?.length || 0} из минимум 4 игроков`
+        })
+        setRegistering(false)
+        return
+      }
+
+      // Check already registered
+      if (isRegistered) {
+        toast.error('Команда уже зарегистрирована')
+        setRegistering(false)
+        return
+      }
+
+      await supabase.from('tournament_teams').insert({
+        tournament_id: id,
+        team_id: team.id,
+        user_id: user.id,
+        status: 'registered',
+      })
+
+      setIsRegistered(true)
+      setRegisteredTeams(prev => [...prev, { team_id: team.id, teams: { name: team.name } }])
+      toast.success('Команда зарегистрирована!', { description: tournament?.title })
+    } catch (e: any) {
+      toast.error('Ошибка: ' + (e.message || ''))
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-3xl px-4 py-10 space-y-4">
+          <div className="h-8 w-32 rounded-lg skeleton" />
+          <div className="h-64 rounded-2xl skeleton" />
+          <div className="h-48 rounded-2xl skeleton" />
+        </div>
+      </PageShell>
+    )
+  }
+
+  if (!tournament) {
+    return (
+      <PageShell>
+        <div className="mx-auto max-w-3xl px-4 py-20 text-center">
+          <h2 className="font-display text-2xl uppercase">Турнир не найден</h2>
+          <button onClick={() => navigate('/tournaments')} className="press mt-4 rounded-lg border border-border px-5 py-2.5 text-sm font-semibold hover:bg-muted">
+            ← Все турниры
+          </button>
+        </div>
+      </PageShell>
+    )
+  }
+
+  const statusColor = tournament.status === 'live'
+    ? 'bg-green-500/10 text-green-600 border-green-500/20'
+    : tournament.status === 'upcoming'
+    ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+    : 'bg-muted text-muted-foreground border-border'
+
+  const statusLabel = tournament.status === 'live' ? '🔴 Идёт' : tournament.status === 'upcoming' ? '🔵 Скоро' : '✓ Завершён'
+
+  return (
+    <PageShell>
+      <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 space-y-6">
+
+        {/* Back */}
+        <button
+          onClick={() => navigate(-1)}
+          className="press inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
+        >
+          <ArrowLeft className="h-4 w-4" /> Назад
+        </button>
+
+        {/* Header */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary to-electric shadow-soft">
+                <Trophy className="h-8 w-8 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="font-display text-3xl uppercase">{tournament.title || tournament.name}</h1>
+                {tournament.description && (
+                  <p className="mt-1 text-sm text-muted-foreground">{tournament.description}</p>
+                )}
+              </div>
+            </div>
+            <span className={`flex-shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
+              {statusLabel}
+            </span>
+          </div>
+
+          {/* Stats */}
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {tournament.prize && tournament.prize !== 'No prize' && (
+              <div className="rounded-xl bg-muted/60 p-3 text-center">
+                <Coins className="mx-auto h-4 w-4 text-yellow-500 mb-1" />
+                <div className="font-display text-sm text-gradient">{tournament.prize}</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Призовой</div>
+              </div>
+            )}
+            <div className="rounded-xl bg-muted/60 p-3 text-center">
+              <Users className="mx-auto h-4 w-4 text-primary mb-1" />
+              <div className="font-display text-sm">{registeredTeams.length}/{tournament.max_teams || '∞'}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Команд</div>
+            </div>
+            {tournament.format && (
+              <div className="rounded-xl bg-muted/60 p-3 text-center">
+                <Shield className="mx-auto h-4 w-4 text-primary mb-1" />
+                <div className="font-display text-sm">{tournament.format}</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Формат</div>
+              </div>
+            )}
+            {tournament.level && (
+              <div className="rounded-xl bg-muted/60 p-3 text-center">
+                <Trophy className="mx-auto h-4 w-4 text-primary mb-1" />
+                <div className="font-display text-sm">{tournament.level}</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Уровень</div>
+              </div>
+            )}
+          </div>
+
+          {/* Info rows */}
+          <div className="mt-4 space-y-2">
+            {(tournament.start_date || tournament.date_text) && (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Дата</div>
+                  <div className="text-sm font-semibold">
+                    {tournament.start_date || tournament.date_text}
+                    {tournament.start_time ? ` · ${tournament.start_time}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
+            {tournament.region && (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Регион</div>
+                  <div className="text-sm font-semibold">{tournament.region}</div>
+                </div>
+              </div>
+            )}
+            {tournament.organizer && (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Организатор</div>
+                  <div className="text-sm font-semibold">{tournament.organizer}</div>
+                </div>
+              </div>
+            )}
+            {tournament.rules && (
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Правила</div>
+                  <div className="text-sm">{tournament.rules}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Register button */}
+          {tournament.status !== 'finished' && (
+            <button
+              onClick={handleRegister}
+              disabled={registering || isRegistered}
+              className={`press mt-5 w-full rounded-xl py-3 text-sm font-bold uppercase tracking-wider transition ${
+                isRegistered
+                  ? 'bg-green-500/10 border border-green-500/20 text-green-600 cursor-default'
+                  : 'bg-gradient-to-r from-primary to-electric text-primary-foreground hover:opacity-90 disabled:opacity-60'
+              }`}
+            >
+              {isRegistered ? '✓ Команда зарегистрирована' : registering ? 'Регистрируем...' : 'Зарегистрировать команду'}
+            </button>
+          )}
+
+          {/* Share link */}
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href)
+              toast.success('Ссылка скопирована!')
+            }}
+            className="press mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
+          >
+            📋 Скопировать ссылку на турнир
+          </button>
+        </div>
+
+        {/* Registered teams */}
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h2 className="font-display text-lg uppercase mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Зарегистрированные команды ({registeredTeams.length})
+          </h2>
+          {registeredTeams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Пока нет зарегистрированных команд. Будь первым!</p>
+          ) : (
+            <div className="space-y-2">
+              {registeredTeams.map((tt, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-electric/20 font-display text-sm text-primary">
+                    {(tt.teams?.name?.[0] || tt.team_id?.[0] || 'T').toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{tt.teams?.name || 'Команда'}</div>
+                    {tt.teams?.tag && <div className="text-xs text-muted-foreground">[{tt.teams.tag}] · {tt.teams.region}</div>}
+                  </div>
+                  <div className="ml-auto text-xs text-green-600 font-semibold bg-green-500/10 rounded-full px-2 py-0.5">
+                    Зарегистрирована
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+    </PageShell>
+  )
+}
