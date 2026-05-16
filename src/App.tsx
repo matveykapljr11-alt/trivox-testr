@@ -12,6 +12,7 @@ import TournamentProfilePage from './pages/TournamentProfilePage'
 import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 import MyTeamPage from './pages/MyTeamPage'
+import AdminPage from './pages/AdminPage'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/tournaments/:id" element={<TournamentProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-team" element={<MyTeamPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <Toaster
