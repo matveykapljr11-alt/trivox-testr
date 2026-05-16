@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 import { Navigate } from 'react-router-dom'
-import { Save, User } from 'lucide-react'
+import { Save, User, Copy, Shield } from 'lucide-react'
 
 const RANKS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Legendary', 'Mythic I', 'Mythic II', 'Champion']
 const ROLES = ['player', 'IGL', 'AWP', 'Entry', 'Support', 'Lurker', 'Coach']
@@ -36,7 +36,6 @@ export default function ProfilePage() {
       }
       await updateProfile(updates)
 
-      // Also sync to players table
       await supabase.from('players').upsert({
         user_id: user!.id,
         ...updates,
@@ -48,6 +47,12 @@ export default function ProfilePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  function copyTrivoxId() {
+    if (!user?.trivox_id) return
+    navigator.clipboard.writeText(user.trivox_id)
+    toast.success('Trivox ID скопирован!')
   }
 
   return (
@@ -70,7 +75,24 @@ export default function ProfilePage() {
               <span className="capitalize">{user?.provider}</span>
               <span>·</span>
               <span className="capitalize">{user?.role}</span>
+              {user?.role === 'admin' && (
+                <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                  <Shield className="h-3 w-3" /> ADMIN
+                </span>
+              )}
             </div>
+
+            {/* Trivox ID */}
+            {user?.trivox_id && (
+              <button
+                onClick={copyTrivoxId}
+                className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-mono hover:bg-muted transition"
+              >
+                <span className="text-muted-foreground">Trivox ID:</span>
+                <span className="font-semibold text-foreground">{user.trivox_id}</span>
+                <Copy className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
           </div>
         </div>
 
