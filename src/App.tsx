@@ -14,6 +14,7 @@ import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 import MyTeamPage from './pages/MyTeamPage'
 import AdminPage from './pages/AdminPage'
+import BanPickPage from './pages/BanPickPage'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/players/:id" element={<PlayerProfilePage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:id" element={<TournamentProfilePage />} />
+          <Route path="/tournaments/:tournamentId/match/:matchId/banpick" element={<BanPickPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-team" element={<MyTeamPage />} />
           <Route path="/admin" element={<AdminPage />} />
