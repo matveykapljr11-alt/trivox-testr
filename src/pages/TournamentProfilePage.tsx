@@ -1,11 +1,46 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Trophy, Users, Calendar, Coins, ArrowLeft, MapPin, Shield, Clock } from 'lucide-react'
+import { Trophy, Users, Calendar, Coins, ArrowLeft, MapPin, Shield, Clock, BookOpen, X } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
+
+function RulesModal({ rules, open, onClose, title = 'Регламент турнира' }: { rules: string; open: boolean; onClose: () => void; title?: string }) {
+  if (!open) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-glow animate-scale-in">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <h2 className="font-display text-xl uppercase">{title}</h2>
+          </div>
+          <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="p-5 max-h-[60vh] overflow-y-auto">
+          <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+            {rules}
+          </div>
+        </div>
+        <div className="border-t border-border p-4">
+          <button
+            onClick={onClose}
+            className="press w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function TournamentProfilePage() {
   const { id } = useParams()
@@ -17,6 +52,8 @@ export default function TournamentProfilePage() {
   const [registering, setRegistering] = useState(false)
   const [isRegistered, setIsRegistered] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [faqOpen, setFaqOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -32,7 +69,6 @@ export default function TournamentProfilePage() {
         if (tour) {
           setTournament(tour)
 
-          // Load registered teams
           const { data: tt } = await supabase
             .from('tournament_teams')
             .select('*, teams(name, tag, region)')
@@ -40,7 +76,6 @@ export default function TournamentProfilePage() {
 
           setRegisteredTeams(tt || [])
 
-          // Check if user's team is registered
           if (user) {
             const { data: myTeam } = await supabase
               .from('teams')
@@ -68,7 +103,6 @@ export default function TournamentProfilePage() {
 
     setRegistering(true)
     try {
-      // Get user's team
       const { data: team } = await supabase
         .from('teams')
         .select('id, name')
@@ -81,7 +115,6 @@ export default function TournamentProfilePage() {
         return
       }
 
-      // Check member count
       const { data: members } = await supabase
         .from('team_members')
         .select('id')
@@ -95,7 +128,6 @@ export default function TournamentProfilePage() {
         return
       }
 
-      // Check already registered
       if (isRegistered) {
         toast.error('Команда уже зарегистрирована')
         setRegistering(false)
@@ -151,12 +183,13 @@ export default function TournamentProfilePage() {
     : 'bg-muted text-muted-foreground border-border'
 
   const statusLabel = tournament.status === 'live' ? '🔴 Идёт' : tournament.status === 'upcoming' ? '🔵 Скоро' : '✓ Завершён'
+  const hasRules = tournament.rules && tournament.rules.trim().length > 0
+  const hasFaq = tournament.faq && tournament.faq.trim().length > 0
 
   return (
     <PageShell>
       <div className="mx-auto max-w-3xl px-4 py-8 md:px-6 space-y-6">
 
-        {/* Back */}
         <button
           onClick={() => navigate(-1)}
           className="press inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition"
@@ -164,7 +197,6 @@ export default function TournamentProfilePage() {
           <ArrowLeft className="h-4 w-4" /> Назад
         </button>
 
-        {/* Header */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -183,7 +215,6 @@ export default function TournamentProfilePage() {
             </span>
           </div>
 
-          {/* Stats */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {tournament.prize && tournament.prize !== 'No prize' && (
               <div className="rounded-xl bg-muted/60 p-3 text-center">
@@ -213,7 +244,6 @@ export default function TournamentProfilePage() {
             )}
           </div>
 
-          {/* Info rows */}
           <div className="mt-4 space-y-2">
             {(tournament.start_date || tournament.date_text) && (
               <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
@@ -245,42 +275,52 @@ export default function TournamentProfilePage() {
                 </div>
               </div>
             )}
-            {tournament.rules && (
-              <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/30 p-3">
-                <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Правила</div>
-                  <div className="text-sm">{tournament.rules}</div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Register button */}
-          {tournament.status !== 'finished' && (
-            <button
-              onClick={handleRegister}
-              disabled={registering || isRegistered}
-              className={`press mt-5 w-full rounded-xl py-3 text-sm font-bold uppercase tracking-wider transition ${
-                isRegistered
-                  ? 'bg-green-500/10 border border-green-500/20 text-green-600 cursor-default'
-                  : 'bg-gradient-to-r from-primary to-electric text-primary-foreground hover:opacity-90 disabled:opacity-60'
-              }`}
-            >
-              {isRegistered ? '✓ Команда зарегистрирована' : registering ? 'Регистрируем...' : 'Зарегистрировать команду'}
-            </button>
-          )}
+          {/* Buttons */}
+          <div className="mt-5 space-y-2">
+            {tournament.status !== 'finished' && (
+              <button
+                onClick={handleRegister}
+                disabled={registering || isRegistered}
+                className={`press w-full rounded-xl py-3 text-sm font-bold uppercase tracking-wider transition ${
+                  isRegistered
+                    ? 'bg-green-500/10 border border-green-500/20 text-green-600 cursor-default'
+                    : 'bg-gradient-to-r from-primary to-electric text-primary-foreground hover:opacity-90 disabled:opacity-60'
+                }`}
+              >
+                {isRegistered ? '✓ Команда зарегистрирована' : registering ? 'Регистрируем...' : 'Зарегистрировать команду'}
+              </button>
+            )}
 
-          {/* Share link */}
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href)
-              toast.success('Ссылка скопирована!')
-            }}
-            className="press mt-3 w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
-          >
-            📋 Скопировать ссылку на турнир
-          </button>
+            <div className="grid grid-cols-2 gap-2">
+              {hasRules && (
+                <button
+                  onClick={() => setRulesOpen(true)}
+                  className="press flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 transition"
+                >
+                  <BookOpen className="h-4 w-4" /> Регламент
+                </button>
+              )}
+              {hasFaq && (
+                <button
+                  onClick={() => setFaqOpen(true)}
+                  className="press flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 py-2.5 text-sm font-semibold hover:bg-muted transition"
+                >
+                  ❓ FAQ
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href)
+                  toast.success('Ссылка скопирована!')
+                }}
+                className={`press flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition ${!hasRules && !hasFaq ? 'col-span-2' : 'col-span-2'}`}
+              >
+                📋 Скопировать ссылку
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Registered teams */}
@@ -313,6 +353,8 @@ export default function TournamentProfilePage() {
 
       </div>
 
+      <RulesModal rules={tournament.rules || ''} open={rulesOpen} onClose={() => setRulesOpen(false)} />
+      <RulesModal rules={tournament.faq || ''} open={faqOpen} onClose={() => setFaqOpen(false)} title="Частые вопросы (FAQ)" />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </PageShell>
   )
