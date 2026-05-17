@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Trophy, Users, Calendar, Coins, ArrowLeft, MapPin, Shield, Clock, BookOpen, X } from 'lucide-react'
+import { Trophy, Users, Calendar, Coins, ArrowLeft, MapPin, Shield, BookOpen, X } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
+import { MatchesSection } from '../components/MatchesSection'
 
-function RulesModal({ rules, open, onClose, title = 'Регламент турнира' }: { rules: string; open: boolean; onClose: () => void; title?: string }) {
+function RulesModal({ rules, open, onClose, title = 'Регламент турнира' }: {
+  rules: string; open: boolean; onClose: () => void; title?: string
+}) {
   if (!open) return null
   return (
     <div
@@ -30,10 +33,7 @@ function RulesModal({ rules, open, onClose, title = 'Регламент турн
           </div>
         </div>
         <div className="border-t border-border p-4">
-          <button
-            onClick={onClose}
-            className="press w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
-          >
+          <button onClick={onClose} className="press w-full rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition">
             Закрыть
           </button>
         </div>
@@ -185,6 +185,7 @@ export default function TournamentProfilePage() {
   const statusLabel = tournament.status === 'live' ? '🔴 Идёт' : tournament.status === 'upcoming' ? '🔵 Скоро' : '✓ Завершён'
   const hasRules = tournament.rules && tournament.rules.trim().length > 0
   const hasFaq = tournament.faq && tournament.faq.trim().length > 0
+  const isOrganizer = user?.id === tournament.organizer_id
 
   return (
     <PageShell>
@@ -197,6 +198,7 @@ export default function TournamentProfilePage() {
           <ArrowLeft className="h-4 w-4" /> Назад
         </button>
 
+        {/* Header */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -215,6 +217,7 @@ export default function TournamentProfilePage() {
             </span>
           </div>
 
+          {/* Stats */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {tournament.prize && tournament.prize !== 'No prize' && (
               <div className="rounded-xl bg-muted/60 p-3 text-center">
@@ -244,6 +247,7 @@ export default function TournamentProfilePage() {
             )}
           </div>
 
+          {/* Info rows */}
           <div className="mt-4 space-y-2">
             {(tournament.start_date || tournament.date_text) && (
               <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
@@ -263,15 +267,6 @@ export default function TournamentProfilePage() {
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wider">Регион</div>
                   <div className="text-sm font-semibold">{tournament.region}</div>
-                </div>
-              </div>
-            )}
-            {tournament.organizer && (
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
-                <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider">Организатор</div>
-                  <div className="text-sm font-semibold">{tournament.organizer}</div>
                 </div>
               </div>
             )}
@@ -315,13 +310,20 @@ export default function TournamentProfilePage() {
                   navigator.clipboard.writeText(window.location.href)
                   toast.success('Ссылка скопирована!')
                 }}
-                className={`press flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition ${!hasRules && !hasFaq ? 'col-span-2' : 'col-span-2'}`}
+                className="press col-span-2 flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted transition"
               >
                 📋 Скопировать ссылку
               </button>
             </div>
           </div>
         </div>
+
+        {/* Matches + BanPick */}
+        <MatchesSection
+          tournamentId={id!}
+          isOrganizer={isOrganizer}
+          registeredTeams={registeredTeams}
+        />
 
         {/* Registered teams */}
         <div className="rounded-2xl border border-border bg-card p-6">
@@ -336,7 +338,7 @@ export default function TournamentProfilePage() {
               {registeredTeams.map((tt, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-electric/20 font-display text-sm text-primary">
-                    {(tt.teams?.name?.[0] || tt.team_id?.[0] || 'T').toUpperCase()}
+                    {(tt.teams?.name?.[0] || 'T').toUpperCase()}
                   </div>
                   <div>
                     <div className="text-sm font-semibold">{tt.teams?.name || 'Команда'}</div>
