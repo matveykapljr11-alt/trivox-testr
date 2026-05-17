@@ -27,6 +27,8 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
   const [dateText, setDateText] = useState(editTournament?.date_text || '')
   const [maxTeams, setMaxTeams] = useState(editTournament?.max_teams?.toString() || '16')
   const [level, setLevel] = useState(editTournament?.level || 'Open')
+  const [rules, setRules] = useState(editTournament?.rules || '')
+  const [faq, setFaq] = useState(editTournament?.faq || '')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -38,6 +40,8 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
       setDateText(editTournament.date_text || '')
       setMaxTeams(editTournament.max_teams.toString())
       setLevel(editTournament.level || 'Open')
+      setRules(editTournament.rules || '')
+      setFaq(editTournament.faq || '')
     }
   }, [editTournament])
 
@@ -54,6 +58,8 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
         date_text: dateText.trim() || null,
         max_teams: parseInt(maxTeams) || 16,
         level: level.trim() || 'Open',
+        rules: rules.trim() || null,
+        faq: faq.trim() || null,
         status: 'upcoming' as const,
         organizer_id: user.id,
       }
@@ -127,6 +133,16 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Дата проведения</label>
             <input value={dateText} onChange={e => setDateText(e.target.value)} placeholder="12—21 июня / Каждую субботу"
               className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Регламент / Правила</label>
+            <textarea value={rules} onChange={e => setRules(e.target.value)} placeholder="Опиши правила турнира, формат проведения, запрещённые действия..." rows={4}
+              className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm outline-none transition focus:border-primary resize-none" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Частые вопросы (FAQ)</label>
+            <textarea value={faq} onChange={e => setFaq(e.target.value)} placeholder="Вопрос: Можно ли заменить игрока?&#10;Ответ: Да, до начала матча.&#10;&#10;Вопрос: Как оспорить результат?&#10;Ответ: Напишите организатору в Discord." rows={4}
+              className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm outline-none transition focus:border-primary resize-none" />
           </div>
           <button onClick={handleSave} disabled={loading}
             className="press mt-2 h-12 w-full rounded-xl bg-gradient-to-r from-primary to-electric text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-60">
