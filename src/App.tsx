@@ -7,6 +7,7 @@ import PrakiPage from './pages/PrakiPage'
 import TeamsPage from './pages/TeamsPage'
 import TeamProfilePage from './pages/TeamProfilePage'
 import PlayersPage from './pages/PlayersPage'
+import PlayerProfilePage from './pages/PlayerProfilePage'
 import TournamentsPage from './pages/TournamentsPage'
 import TournamentProfilePage from './pages/TournamentProfilePage'
 import ProfilePage from './pages/ProfilePage'
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:id" element={<TeamProfilePage />} />
           <Route path="/players" element={<PlayersPage />} />
+          <Route path="/players/:id" element={<PlayerProfilePage />} />
           <Route path="/tournaments" element={<TournamentsPage />} />
           <Route path="/tournaments/:id" element={<TournamentProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
