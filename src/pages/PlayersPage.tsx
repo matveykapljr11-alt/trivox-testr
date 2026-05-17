@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Crosshair, Crown, Headphones, Shield, Sparkles, Target, Search, Plus, X, Users, Briefcase } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
@@ -423,7 +424,7 @@ export default function PlayersPage() {
                     )}
                   </div>
                   <div>
-                    <div className="font-display text-base">{p.name}</div>
+                    <Link to={`/players/${p.id}`} className="font-display text-base hover:text-primary transition">{p.name}</Link>
                     <div className="text-xs text-muted-foreground">
                       {p.role}{p.rank_mm ? ` · ${p.rank_mm}` : ''}
                     </div>
