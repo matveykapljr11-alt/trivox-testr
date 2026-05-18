@@ -29,6 +29,7 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
   const [level, setLevel] = useState(editTournament?.level || 'Open')
   const [rules, setRules] = useState(editTournament?.rules || '')
   const [faq, setFaq] = useState(editTournament?.faq || '')
+  const [isPrivate, setIsPrivate] = useState(editTournament?.is_private || false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -42,6 +43,7 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
       setLevel(editTournament.level || 'Open')
       setRules(editTournament.rules || '')
       setFaq(editTournament.faq || '')
+      setIsPrivate(editTournament.is_private || false)
     }
   }, [editTournament])
 
@@ -60,6 +62,7 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
         level: level.trim() || 'Open',
         rules: rules.trim() || null,
         faq: faq.trim() || null,
+        is_private: isPrivate,
         status: 'upcoming' as const,
         organizer_id: user.id,
       }
@@ -143,6 +146,24 @@ function TournamentModal({ open, onClose, onSaved, editTournament }: {
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Частые вопросы (FAQ)</label>
             <textarea value={faq} onChange={e => setFaq(e.target.value)} placeholder="Вопрос: Можно ли заменить игрока?&#10;Ответ: Да, до начала матча.&#10;&#10;Вопрос: Как оспорить результат?&#10;Ответ: Напишите организатору в Discord." rows={4}
               className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm outline-none transition focus:border-primary resize-none" />
+          </div>
+          {/* Private toggle */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
+            <div>
+              <div className="text-sm font-semibold">Закрытый турнир</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Регистрация только по ссылке, виден всем</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPrivate(v => !v)}
+              className={`press relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isPrivate ? 'bg-primary' : 'bg-muted-foreground/30'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                isPrivate ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
           </div>
           <button onClick={handleSave} disabled={loading}
             className="press mt-2 h-12 w-full rounded-xl bg-gradient-to-r from-primary to-electric text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-60">
@@ -258,6 +279,11 @@ export default function TournamentsPage() {
                           <Trash2 className="h-3.5 w-3.5 text-danger" />
                         </button>
                       </>
+                    )}
+                    {t.is_private && (
+                      <span className="flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        🔒 Закрытый
+                      </span>
                     )}
                     <Trophy className="h-5 w-5 text-primary transition-transform group-hover:rotate-12" />
                   </div>
