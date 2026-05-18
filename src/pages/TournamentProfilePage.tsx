@@ -212,9 +212,16 @@ export default function TournamentProfilePage() {
                 )}
               </div>
             </div>
-            <span className={`flex-shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
-              {statusLabel}
-            </span>
+            <div className="flex flex-col items-end gap-1.5">
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
+                {statusLabel}
+              </span>
+              {tournament.is_private && (
+                <span className="flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+                  🔒 Закрытый — только по ссылке
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Stats */}
@@ -289,22 +296,28 @@ export default function TournamentProfilePage() {
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              {hasRules && (
-                <button
-                  onClick={() => setRulesOpen(true)}
-                  className="press flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 transition"
-                >
-                  <BookOpen className="h-4 w-4" /> Регламент
-                </button>
-              )}
-              {hasFaq && (
-                <button
-                  onClick={() => setFaqOpen(true)}
-                  className="press flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 py-2.5 text-sm font-semibold hover:bg-muted transition"
-                >
-                  ❓ FAQ
-                </button>
-              )}
+              <button
+                onClick={() => hasRules ? setRulesOpen(true) : undefined}
+                disabled={!hasRules}
+                className={`press flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  hasRules
+                    ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'
+                    : 'border-border bg-muted/30 text-muted-foreground opacity-50 cursor-default'
+                }`}
+              >
+                <BookOpen className="h-4 w-4" /> Регламент
+              </button>
+              <button
+                onClick={() => hasFaq ? setFaqOpen(true) : undefined}
+                disabled={!hasFaq}
+                className={`press flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition ${
+                  hasFaq
+                    ? 'border-border bg-muted/40 hover:bg-muted'
+                    : 'border-border bg-muted/30 text-muted-foreground opacity-50 cursor-default'
+                }`}
+              >
+                ❓ FAQ
+              </button>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href)
