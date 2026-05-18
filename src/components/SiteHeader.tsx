@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, LogOut, User, Bell, Check, XCircle } from 'lucide-react'
+import { Menu, X, LogOut, User, Bell, Check, XCircle, Moon, Sun } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from './AuthModal'
 import { supabase } from '../lib/supabase'
@@ -14,6 +14,28 @@ const nav = [
   { to: '/my-team', label: 'Моя команда' },
 ]
 
+function useTheme() {
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = localStorage.getItem('theme')
+    if (saved) return saved === 'dark'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDark) {
+      root.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      root.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [isDark])
+
+  return { isDark, toggle: () => setIsDark(v => !v) }
+}
+
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
@@ -22,12 +44,11 @@ export function SiteHeader() {
   const [challenges, setChallenges] = useState<any[]>([])
   const { user, isLoggedIn, signOut } = useAuth()
   const { pathname } = useLocation()
+  const { isDark, toggle } = useTheme()
 
-  // Load incoming challenges for user's scrims
   async function loadChallenges() {
     if (!user) return
     try {
-      // Get user's scrims
       const { data: scrims } = await supabase
         .from('scrims')
         .select('id, team_name')
@@ -37,7 +58,6 @@ export function SiteHeader() {
 
       const scrimIds = scrims.map((s: any) => s.id)
 
-      // Get pending challenges for those scrims
       const { data: ch } = await supabase
         .from('scrim_challenges')
         .select('*')
@@ -46,7 +66,6 @@ export function SiteHeader() {
         .order('created_at', { ascending: false })
 
       if (ch) {
-        // Attach scrim name
         const withNames = ch.map((c: any) => ({
           ...c,
           scrim_team_name: scrims.find((s: any) => s.id === c.scrim_id)?.team_name || '—'
@@ -62,7 +81,6 @@ export function SiteHeader() {
     if (isLoggedIn) loadChallenges()
   }, [isLoggedIn, user])
 
-  // Poll every 30 seconds
   useEffect(() => {
     if (!isLoggedIn) return
     const interval = setInterval(loadChallenges, 30000)
@@ -103,6 +121,7 @@ export function SiteHeader() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 md:px-6">
+
           {/* Logo */}
           <Link to="/" className="press flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-primary to-electric shadow-glow">
@@ -132,6 +151,18 @@ export function SiteHeader() {
           {/* Right side */}
           <div className="flex items-center gap-2">
 
+            {/* Dark mode toggle */}
+            <button
+              onClick={toggle}
+              className="press grid h-9 w-9 place-items-center rounded-lg border border-border bg-card transition hover:border-primary/40 hover:bg-muted"
+              title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+            >
+              {isDark
+                ? <Sun className="h-4 w-4 text-yellow-400" />
+                : <Moon className="h-4 w-4" />
+              }
+            </button>
+
             {/* Bell notifications */}
             {isLoggedIn && (
               <div className="relative">
@@ -157,7 +188,6 @@ export function SiteHeader() {
                         </span>
                       )}
                     </div>
-
                     {challenges.length === 0 ? (
                       <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                         Нет входящих заявок
@@ -225,6 +255,24 @@ export function SiteHeader() {
                       >
                         <User className="h-4 w-4 text-muted-foreground" /> Мой профиль
                       </Link>
+                      {user.role === 'admin' && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-primary hover:bg-muted"
+                        >
+                          🛡️ Админ панель
+                        </Link>
+                      )}
+                      <button
+                        onClick={toggle}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted"
+                      >
+                        {isDark
+                          ? <><Sun className="h-4 w-4 text-yellow-400" /> Светлая тема</>
+                          : <><Moon className="h-4 w-4 text-muted-foreground" /> Тёмная тема</>
+                        }
+                      </button>
                       <button
                         onClick={handleSignOut}
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-danger hover:bg-muted"
@@ -281,6 +329,15 @@ export function SiteHeader() {
                   {n.label}
                 </Link>
               ))}
+              <button
+                onClick={toggle}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition"
+              >
+                {isDark
+                  ? <><Sun className="h-4 w-4 text-yellow-400" /> Светлая тема</>
+                  : <><Moon className="h-4 w-4" /> Тёмная тема</>
+                }
+              </button>
               {!isLoggedIn && (
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
@@ -302,7 +359,6 @@ export function SiteHeader() {
         )}
       </header>
 
-      {/* Click outside to close menus */}
       {(userMenuOpen || bellOpen) && (
         <div className="fixed inset-0 z-40" onClick={() => { setUserMenuOpen(false); setBellOpen(false) }} />
       )}
