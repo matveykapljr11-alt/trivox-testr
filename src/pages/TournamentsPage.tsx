@@ -213,11 +213,17 @@ export default function TournamentsPage() {
   async function handleDelete(tournament: Tournament) {
     if (!confirm('Удалить турнир?')) return
     try {
-      await supabase.from('tournaments').delete().eq('id', tournament.id)
+      // Delete related data first
+      await supabase.from('matches').delete().eq('tournament_id', tournament.id)
+      await supabase.from('tournament_teams').delete().eq('tournament_id', tournament.id)
+
+      const { error } = await supabase.from('tournaments').delete().eq('id', tournament.id)
+      if (error) throw error
+
       setTournaments(prev => prev.filter(t => t.id !== tournament.id))
       toast.success('Турнир удалён')
-    } catch {
-      toast.error('Ошибка удаления')
+    } catch (e: any) {
+      toast.error('Ошибка удаления: ' + (e.message || JSON.stringify(e)))
     }
   }
 
