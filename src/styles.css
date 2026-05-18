@@ -27,6 +27,7 @@
   --radius: 0.75rem;
 }
 
+/* ===== LIGHT THEME (default) ===== */
 :root {
   --background: oklch(0.985 0.008 230);
   --foreground: oklch(0.18 0.05 250);
@@ -54,6 +55,43 @@
   --grid-color: color-mix(in oklab, oklch(0.62 0.18 245) 14%, transparent);
 }
 
+/* ===== DARK THEME ===== */
+html.dark {
+  --background: oklch(0.13 0.03 255);
+  --foreground: oklch(0.93 0.01 230);
+  --card: oklch(0.18 0.04 255);
+  --card-foreground: oklch(0.93 0.01 230);
+  --primary: oklch(0.65 0.2 245);
+  --primary-foreground: oklch(1 0 0);
+  --muted: oklch(0.22 0.04 255);
+  --muted-foreground: oklch(0.6 0.04 245);
+  --accent: oklch(0.25 0.06 250);
+  --accent-foreground: oklch(0.9 0.02 230);
+  --border: oklch(0.28 0.05 255);
+  --input: oklch(0.24 0.04 255);
+  --ring: oklch(0.65 0.2 245);
+  --ice: oklch(0.2 0.04 250);
+  --electric: oklch(0.7 0.2 240);
+  --deep: oklch(0.08 0.03 260);
+  --neon: oklch(0.85 0.2 195);
+  --danger: oklch(0.65 0.22 28);
+  --gradient-primary: linear-gradient(135deg, oklch(0.65 0.2 245), oklch(0.74 0.16 220));
+  --gradient-neon: linear-gradient(135deg, oklch(0.7 0.2 240), oklch(0.85 0.2 195));
+  --gradient-hero: radial-gradient(ellipse at top, oklch(0.22 0.08 250) 0%, oklch(0.13 0.03 255) 60%);
+  --gradient-dark: radial-gradient(ellipse at 50% 0%, oklch(0.28 0.12 255) 0%, oklch(0.12 0.05 255) 70%);
+  --gradient-mesh: conic-gradient(from 180deg at 50% 50%, oklch(0.25 0.07 250), oklch(0.2 0.04 255), oklch(0.3 0.1 240), oklch(0.25 0.07 250));
+  --grid-color: color-mix(in oklab, oklch(0.65 0.2 245) 18%, transparent);
+}
+
+html.dark .skeleton {
+  background: linear-gradient(90deg, oklch(0.22 0.04 255) 0%, oklch(0.28 0.05 255) 50%, oklch(0.22 0.04 255) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+html.dark ::-webkit-scrollbar-track { background: oklch(0.18 0.04 255); }
+html.dark ::-webkit-scrollbar-thumb { background: oklch(0.35 0.06 245); }
+
 @layer base {
   * { border-color: var(--color-border); }
   html { scroll-behavior: smooth; }
@@ -63,6 +101,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     padding-bottom: env(safe-area-inset-bottom);
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   @media (max-width: 767px) { body { padding-bottom: 64px; } }
   h1, h2, h3, h4 {
