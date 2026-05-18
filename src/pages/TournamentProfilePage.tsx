@@ -141,6 +141,7 @@ export default function TournamentProfilePage() {
   const [authOpen, setAuthOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [faqOpen, setFaqOpen] = useState(false)
+  const [descOpen, setDescOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -220,7 +221,11 @@ export default function TournamentProfilePage() {
               </div>
               <div>
                 <h1 className="font-display text-3xl uppercase">{tournament.title || tournament.name}</h1>
-                {tournament.description && <p className="mt-1 text-sm text-muted-foreground">{tournament.description}</p>}
+                {tournament.description && (
+                  <button onClick={() => setDescOpen(true)} className="mt-1 text-sm text-primary hover:underline text-left transition">
+                    Читать описание →
+                  </button>
+                )}
                 {isTournamentAdmin && !isOrganizer && (
                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-600">
                     <Crown className="h-2.5 w-2.5" /> Вы администратор турнира
@@ -331,6 +336,7 @@ export default function TournamentProfilePage() {
         </div>
       </div>
 
+      <RulesModal rules={tournament.description || ''} open={descOpen} onClose={() => setDescOpen(false)} title="Описание турнира" />
       <RulesModal rules={tournament.rules || ''} open={rulesOpen} onClose={() => setRulesOpen(false)} />
       <RulesModal rules={tournament.faq || ''} open={faqOpen} onClose={() => setFaqOpen(false)} title="Частые вопросы (FAQ)" />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
