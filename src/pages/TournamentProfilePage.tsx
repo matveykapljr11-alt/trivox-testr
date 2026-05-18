@@ -7,6 +7,7 @@ import { AuthModal } from '../components/AuthModal'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 import { MatchesSection } from '../components/MatchesSection'
+import { BracketSection } from '../components/BracketSection'
 
 function RulesModal({ rules, open, onClose, title = 'Регламент турнира' }: {
   rules: string; open: boolean; onClose: () => void; title?: string
@@ -330,6 +331,13 @@ export default function TournamentProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Bracket */}
+        <BracketSection
+          tournamentId={id!}
+          isOrganizer={isOrganizer}
+          registeredTeams={registeredTeams}
+        />
 
         {/* Matches + BanPick */}
         <MatchesSection
