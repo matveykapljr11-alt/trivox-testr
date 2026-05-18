@@ -251,10 +251,10 @@ export default function TournamentsPage() {
                   <div className="flex items-center gap-1">
                     {isOrganizer && !isDemoId && (
                       <>
-                        <button onClick={() => setEditTournament(t)} className="press rounded-lg p-1.5 hover:bg-muted">
+                        <button onClick={e => { e.stopPropagation(); setEditTournament(t) }} className="press rounded-lg p-1.5 hover:bg-muted">
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                         </button>
-                        <button onClick={() => handleDelete(t)} className="press rounded-lg p-1.5 hover:bg-muted">
+                        <button onClick={e => { e.stopPropagation(); handleDelete(t) }} className="press rounded-lg p-1.5 hover:bg-muted">
                           <Trash2 className="h-3.5 w-3.5 text-danger" />
                         </button>
                       </>
@@ -263,16 +263,28 @@ export default function TournamentsPage() {
                   </div>
                 </div>
 
-                <Link to={isDemoId ? '/tournaments' : `/tournaments/${t.id}`}>
-                  <h3 className="mt-3 font-display text-xl uppercase hover:text-primary transition">{t.title}</h3>
-                </Link>
-
-                <dl className="mt-4 space-y-2 text-sm flex-1">
-                  {t.date_text && <div className="flex justify-between"><dt className="text-muted-foreground">Дата</dt><dd>{t.date_text}</dd></div>}
-                  {t.prize && <div className="flex justify-between"><dt className="text-muted-foreground">Призовой</dt><dd className="font-semibold text-gradient">{t.prize}</dd></div>}
-                  <div className="flex justify-between"><dt className="text-muted-foreground">Уровень</dt><dd>{t.level || 'Open'}</dd></div>
-                  <div className="flex justify-between"><dt className="text-muted-foreground">Формат</dt><dd>{t.format}</dd></div>
-                </dl>
+                {/* Clickable area */}
+                {!isDemoId ? (
+                  <Link to={`/tournaments/${t.id}`} className="block flex-1">
+                    <h3 className="mt-3 font-display text-xl uppercase hover:text-primary transition">{t.title}</h3>
+                    <dl className="mt-4 space-y-2 text-sm">
+                      {t.date_text && <div className="flex justify-between"><dt className="text-muted-foreground">Дата</dt><dd>{t.date_text}</dd></div>}
+                      {t.prize && <div className="flex justify-between"><dt className="text-muted-foreground">Призовой</dt><dd className="font-semibold text-gradient">{t.prize}</dd></div>}
+                      <div className="flex justify-between"><dt className="text-muted-foreground">Уровень</dt><dd>{t.level || 'Open'}</dd></div>
+                      <div className="flex justify-between"><dt className="text-muted-foreground">Формат</dt><dd>{t.format}</dd></div>
+                    </dl>
+                  </Link>
+                ) : (
+                  <div className="flex-1">
+                    <h3 className="mt-3 font-display text-xl uppercase">{t.title}</h3>
+                    <dl className="mt-4 space-y-2 text-sm">
+                      {t.date_text && <div className="flex justify-between"><dt className="text-muted-foreground">Дата</dt><dd>{t.date_text}</dd></div>}
+                      {t.prize && <div className="flex justify-between"><dt className="text-muted-foreground">Призовой</dt><dd className="font-semibold text-gradient">{t.prize}</dd></div>}
+                      <div className="flex justify-between"><dt className="text-muted-foreground">Уровень</dt><dd>{t.level || 'Open'}</dd></div>
+                      <div className="flex justify-between"><dt className="text-muted-foreground">Формат</dt><dd>{t.format}</dd></div>
+                    </dl>
+                  </div>
+                )}
 
                 <div className="mt-5 flex gap-2">
                   {!isDemoId && (
@@ -284,15 +296,14 @@ export default function TournamentsPage() {
                     </Link>
                   )}
                   {isDemoId && (
-                    <button
-                      className="press flex-1 rounded-lg border border-border py-2 text-sm font-semibold hover:bg-muted transition"
-                    >
+                    <button className="press flex-1 rounded-lg border border-border py-2 text-sm font-semibold hover:bg-muted transition">
                       {t.status === 'upcoming' ? 'Скоро' : t.status === 'live' ? 'Смотреть' : 'Результаты'}
                     </button>
                   )}
                   {!isDemoId && (
                     <button
-                      onClick={() => {
+                      onClick={e => {
+                        e.preventDefault()
                         navigator.clipboard.writeText(`${window.location.origin}/tournaments/${t.id}`)
                         toast.success('Ссылка скопирована!')
                       }}
