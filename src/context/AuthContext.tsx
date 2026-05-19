@@ -22,20 +22,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsProfile, setNeedsProfile] = useState(false)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        await handleSession(session)
-      } else if (event === 'SIGNED_OUT') {
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        console.error('Session error:', error)
+        // Clear bad session
+        await supabase.auth.signOut()
         setUser(null)
-        setNeedsProfile(false)
+        setLoading(false)
+        return
+      }
+      if (session) {
+        await handleSession(session)
       }
       setLoading(false)
     })
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event)
+
+      if (event === 'SIGNED_IN' && session) {
         await handleSession(session)
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        // Token refreshed successfully — update user if needed
+        if (!user) await handleSession(session)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setNeedsProfile(false)
       }
+
       setLoading(false)
     })
 
@@ -44,17 +60,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function handleSession(session: any) {
     const oauthUser = session.user
+    if (!oauthUser) return
+
     const meta = oauthUser.user_metadata || {}
     const name = meta.full_name || meta.name || meta.user_name || oauthUser.email?.split('@')[0] || 'Player'
     const avatarText = name.slice(0, 2).toUpperCase()
     const avatarUrl = meta.avatar_url || meta.picture || null
 
     try {
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error } = await supabase
         .from('users')
         .select('*')
         .eq('provider_id', oauthUser.id)
         .single()
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = not found, that's ok
+        console.error('Error fetching user:', error)
+        return
+      }
 
       if (existingUser) {
         if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
@@ -63,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({ ...existingUser, avatarUrl })
         setNeedsProfile(false)
       } else {
-        const { data: newUser } = await supabase.from('users').insert({
+        const { data: newUser, error: insertError } = await supabase.from('users').insert({
           provider_id: oauthUser.id,
           provider: oauthUser.app_metadata?.provider || 'discord',
           name,
@@ -72,6 +96,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'player',
           lang: 'ru',
         }).select().single()
+
+        if (insertError) {
+          console.error('Error creating user:', insertError)
+          return
+        }
 
         if (newUser) {
           setUser({ ...newUser, avatarUrl })
@@ -102,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await supabase.auth.signOut()
     setUser(null)
+    setNeedsProfile(false)
   }
 
   async function updateProfile(data: Partial<User>) {
@@ -134,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       needsProfile,
       setNeedsProfile,
     }}>
-{children}
+      {children}
     </AuthContext.Provider>
   )
 }
