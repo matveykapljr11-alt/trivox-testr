@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react'
 import { supabase, type User } from '../lib/supabase'
 
 type AuthContextType = {
@@ -20,26 +20,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [needsProfile, setNeedsProfile] = useState(false)
+  const sessionHandled = useRef(false)
+  const mounted = useRef(true)
 
   useEffect(() => {
-    let mounted = true
+    mounted.current = true
+    sessionHandled.current = false
 
-    // Listen for auth changes FIRST (before getSession)
-    // This ensures we catch the SIGNED_IN event on mobile OAuth redirect
+    // 1. Subscribe to auth changes FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+      if (!mounted.current) return
       console.log('Auth event:', event)
 
-      if (event === 'INITIAL_SESSION') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
         if (session) {
+          sessionHandled.current = true
           await handleSession(session)
         }
         setLoading(false)
-      } else if (event === 'SIGNED_IN' && session) {
-        await handleSession(session)
-        setLoading(false)
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        if (!user) await handleSession(session)
+        if (!user) {
+          sessionHandled.current = true
+          await handleSession(session)
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setNeedsProfile(false)
@@ -47,44 +50,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    // Fallback: also try getSession in case onAuthStateChange doesn't fire
-    setTimeout(() => {
-      if (!mounted) return
-      supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-        if (!mounted) return
-        if (error) {
-          console.error('Session error:', error)
-          setLoading(false)
-          return
-        }
-        if (session && !user) {
-          await handleSession(session)
-        }
-        setLoading(false)
-      })
+    // 2. Fallback #1 — 500ms
+    const t1 = setTimeout(async () => {
+      if (!mounted.current || sessionHandled.current) return
+      console.log('Fallback #1 — checking session')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session && !sessionHandled.current) {
+        sessionHandled.current = true
+        await handleSession(session)
+      }
+      setLoading(false)
     }, 500)
 
+    // 3. Fallback #2 — 2000ms (for very slow mobile)
+    const t2 = setTimeout(async () => {
+      if (!mounted.current || sessionHandled.current) return
+      console.log('Fallback #2 — checking session again')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session && !sessionHandled.current) {
+        sessionHandled.current = true
+        await handleSession(session)
+      }
+      setLoading(false)
+    }, 2000)
+
+    // 4. Fallback #3 — 4000ms (last resort)
+    const t3 = setTimeout(async () => {
+      if (!mounted.current || sessionHandled.current) return
+      console.log('Fallback #3 — final attempt')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session && !sessionHandled.current) {
+        sessionHandled.current = true
+        await handleSession(session)
+      }
+      // Force stop loading
+      setLoading(false)
+    }, 4000)
+
     return () => {
-      mounted = false
+      mounted.current = false
       subscription.unsubscribe()
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
     }
   }, [])
 
   async function handleSession(session: any) {
     const oauthUser = session?.user
-    if (!oauthUser) return
+    if (!oauthUser || !mounted.current) return
 
     const meta = oauthUser.user_metadata || {}
     const name = meta.full_name || meta.name || meta.user_name || oauthUser.email?.split('@')[0] || 'Player'
     const avatarText = name.slice(0, 2).toUpperCase()
     const avatarUrl = meta.avatar_url || meta.picture || null
 
-    try {
-      // Retry up to 3 times in case of network issues on mobile
-      let existingUser = null
-      let fetchError = null
+    // Retry fetching user up to 5 times
+    let existingUser = null
+    let fetchError = null
 
-      for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!mounted.current) return
+      try {
         const { data, error } = await supabase
           .from('users')
           .select('*')
@@ -93,63 +120,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error && error.code !== 'PGRST116') {
           fetchError = error
-          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
           continue
         }
 
         existingUser = data
         fetchError = null
         break
+      } catch (e) {
+        fetchError = e
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
       }
+    }
 
-      if (fetchError) {
-        console.error('Error fetching user after retries:', fetchError)
+    if (!mounted.current) return
+
+    if (fetchError && !existingUser) {
+      console.error('Error fetching user after retries:', fetchError)
+      return
+    }
+
+    if (existingUser) {
+      if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
+        await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', existingUser.id)
+      }
+      if (mounted.current) {
+        setUser({ ...existingUser, avatarUrl })
+        setNeedsProfile(false)
+      }
+    } else {
+      // Create new user
+      const { data: newUser, error: insertError } = await supabase.from('users').insert({
+        provider_id: oauthUser.id,
+        provider: oauthUser.app_metadata?.provider || 'google',
+        name,
+        avatar: avatarText,
+        avatar_url: avatarUrl,
+        role: 'player',
+        lang: 'ru',
+      }).select().single()
+
+      if (insertError) {
+        // Duplicate key — fetch existing
+        if (insertError.code === '23505') {
+          const { data: retryUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('provider_id', oauthUser.id)
+            .single()
+          if (retryUser && mounted.current) {
+            setUser({ ...retryUser, avatarUrl })
+            setNeedsProfile(false)
+          }
+          return
+        }
+        console.error('Error creating user:', insertError)
         return
       }
 
-      if (existingUser) {
-        if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
-          await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', existingUser.id)
-        }
-        setUser({ ...existingUser, avatarUrl })
-        setNeedsProfile(false)
-      } else {
-        // New user — create profile
-        const { data: newUser, error: insertError } = await supabase.from('users').insert({
-          provider_id: oauthUser.id,
-          provider: oauthUser.app_metadata?.provider || 'google',
-          name,
-          avatar: avatarText,
-          avatar_url: avatarUrl,
-          role: 'player',
-          lang: 'ru',
-        }).select().single()
-
-        if (insertError) {
-          // Maybe duplicate — try to fetch again
-          if (insertError.code === '23505') {
-            const { data: retryUser } = await supabase
-              .from('users')
-              .select('*')
-              .eq('provider_id', oauthUser.id)
-              .single()
-            if (retryUser) {
-              setUser({ ...retryUser, avatarUrl })
-              setNeedsProfile(false)
-              return
-            }
-          }
-          console.error('Error creating user:', insertError)
-          return
-        }
-
-        if (newUser) {
-          setUser({ ...newUser, avatarUrl })
-          setNeedsProfile(true)
-        }
+      if (newUser && mounted.current) {
+        setUser({ ...newUser, avatarUrl })
+        setNeedsProfile(true)
       }
-    } catch (e) {
-      console.error('Error handling session:', e)
     }
   }
 
