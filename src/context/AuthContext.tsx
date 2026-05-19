@@ -22,44 +22,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [needsProfile, setNeedsProfile] = useState(false)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        console.error('Session error:', error)
-        // Clear bad session
-        await supabase.auth.signOut()
-        setUser(null)
-        setLoading(false)
-        return
-      }
-      if (session) {
-        await handleSession(session)
-      }
-      setLoading(false)
-    })
+    let mounted = true
 
-    // Listen for auth changes
+    // Listen for auth changes FIRST (before getSession)
+    // This ensures we catch the SIGNED_IN event on mobile OAuth redirect
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
       console.log('Auth event:', event)
 
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'INITIAL_SESSION') {
+        if (session) {
+          await handleSession(session)
+        }
+        setLoading(false)
+      } else if (event === 'SIGNED_IN' && session) {
         await handleSession(session)
+        setLoading(false)
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Token refreshed successfully — update user if needed
         if (!user) await handleSession(session)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setNeedsProfile(false)
+        setLoading(false)
       }
-
-      setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    // Fallback: also try getSession in case onAuthStateChange doesn't fire
+    setTimeout(() => {
+      if (!mounted) return
+      supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+        if (!mounted) return
+        if (error) {
+          console.error('Session error:', error)
+          setLoading(false)
+          return
+        }
+        if (session && !user) {
+          await handleSession(session)
+        }
+        setLoading(false)
+      })
+    }, 500)
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function handleSession(session: any) {
-    const oauthUser = session.user
+    const oauthUser = session?.user
     if (!oauthUser) return
 
     const meta = oauthUser.user_metadata || {}
@@ -68,15 +80,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const avatarUrl = meta.avatar_url || meta.picture || null
 
     try {
-      const { data: existingUser, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('provider_id', oauthUser.id)
-        .single()
+      // Retry up to 3 times in case of network issues on mobile
+      let existingUser = null
+      let fetchError = null
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = not found, that's ok
-        console.error('Error fetching user:', error)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('provider_id', oauthUser.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          fetchError = error
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          continue
+        }
+
+        existingUser = data
+        fetchError = null
+        break
+      }
+
+      if (fetchError) {
+        console.error('Error fetching user after retries:', fetchError)
         return
       }
 
@@ -87,9 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser({ ...existingUser, avatarUrl })
         setNeedsProfile(false)
       } else {
+        // New user — create profile
         const { data: newUser, error: insertError } = await supabase.from('users').insert({
           provider_id: oauthUser.id,
-          provider: oauthUser.app_metadata?.provider || 'discord',
+          provider: oauthUser.app_metadata?.provider || 'google',
           name,
           avatar: avatarText,
           avatar_url: avatarUrl,
@@ -98,6 +126,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }).select().single()
 
         if (insertError) {
+          // Maybe duplicate — try to fetch again
+          if (insertError.code === '23505') {
+            const { data: retryUser } = await supabase
+              .from('users')
+              .select('*')
+              .eq('provider_id', oauthUser.id)
+              .single()
+            if (retryUser) {
+              setUser({ ...retryUser, avatarUrl })
+              setNeedsProfile(false)
+              return
+            }
+          }
           console.error('Error creating user:', insertError)
           return
         }
@@ -112,19 +153,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signInWithGoogle() {
+    const redirectTo = window.location.origin
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    })
+  }
+
   async function signInWithDiscord() {
     const redirectTo = window.location.origin
     await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: { redirectTo, scopes: 'identify email' },
-    })
-  }
-
-  async function signInWithGoogle() {
-    const redirectTo = window.location.origin
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo },
     })
   }
 
