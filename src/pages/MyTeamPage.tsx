@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Navigate } from 'react-router-dom'
+import { Navigate, Link } from 'react-router-dom'
 import { Users, Calendar, Plus, Trophy, Swords, X, Clock, Map, MessageCircle, Send } from 'lucide-react'
 
 function getDays() {
@@ -311,9 +311,9 @@ export default function MyTeamPage() {
             <Users className="mx-auto h-8 w-8 text-muted-foreground" />
             <h3 className="mt-4 font-display text-2xl uppercase">У тебя нет команды</h3>
             <p className="mt-2 text-sm text-muted-foreground">Создай команду на странице Команды</p>
-            <a href="/teams" className="press mt-4 inline-block rounded-lg bg-gradient-to-r from-primary to-electric px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
+            <Link to="/teams" className="press mt-4 inline-block rounded-lg bg-gradient-to-r from-primary to-electric px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
               Создать команду
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
@@ -364,9 +364,9 @@ export default function MyTeamPage() {
                 {totalEvents === 0 ? (
                   <div className="rounded-xl border border-dashed border-border p-6 text-center">
                     <p className="text-sm text-muted-foreground">Нет праков и турниров на этот день</p>
-                    <a href="/praki" className="press mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary to-electric px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90">
+                    <Link to="/praki" className="press mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-primary to-electric px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90">
                       <Plus className="h-3.5 w-3.5" /> Запланировать прак
-                    </a>
+                    </Link>
                   </div>
                 ) : (
                   <div className="space-y-3">
