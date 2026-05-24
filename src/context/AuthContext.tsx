@@ -26,12 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     let handled = false
 
-    // Единственный источник истины - onAuthStateChange.
-    // INITIAL_SESSION прилетит сразу после подписки, даже если сессии нет.
+    console.log('[auth] AuthProvider mounted, subscribing...')
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
-        console.log('[auth]', event, !!session)
+        console.log('[auth]', event, 'session:', !!session, 'handled:', handled)
 
         if (event === 'SIGNED_OUT') {
           setUser(null)
@@ -41,17 +41,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user && !handled) {
+          console.log('[auth] about to call loadOrCreateUser')
           handled = true
-          await loadOrCreateUser(session)
+          try {
+            await loadOrCreateUser(session)
+            console.log('[auth] loadOrCreateUser returned successfully')
+          } catch (err) {
+            console.error('[auth] loadOrCreateUser threw exception:', err)
+          }
+        } else if (session?.user && handled) {
+          console.log('[auth] session present but handled=true, skipping')
         }
 
-        // INITIAL_SESSION приходит ВСЕГДА (с сессией или без) -
-        // это сигнал что инициализация закончена
         if (event === 'INITIAL_SESSION') {
           setLoading(false)
         }
 
-        // На случай SIGNED_IN без предшествующего INITIAL_SESSION
         if (event === 'SIGNED_IN') {
           setLoading(false)
         }
@@ -59,13 +64,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
 
     return () => {
+      console.log('[auth] AuthProvider unmounting')
       mounted = false
       subscription.unsubscribe()
     }
   }, [])
 
   async function loadOrCreateUser(session: Session) {
+    console.log('[auth] loadOrCreateUser START')
     const oauthUser = session.user
+    console.log('[auth] oauth user:', {
+      id: oauthUser.id,
+      email: oauthUser.email,
+      provider: oauthUser.app_metadata?.provider,
+    })
+
     const meta = oauthUser.user_metadata || {}
     const name =
       meta.full_name ||
@@ -76,10 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const avatarText = name.slice(0, 2).toUpperCase()
     const avatarUrl = meta.avatar_url || meta.picture || null
 
-    // Атомарный upsert вместо select-then-insert.
-    // Никаких retry, никаких race condition с duplicate key.
-    // Требует UNIQUE constraint на provider_id.
-    const { data, error } = await supabase
+    console.log('[auth] computed values:', { name, avatarText, avatarUrl })
+
+    console.log('[auth] calling upsert...')
+    const upsertResult = await supabase
       .from('users')
       .upsert(
         {
@@ -99,22 +112,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select()
       .single()
 
-    if (error) {
-      console.error('[auth] upsert failed:', error)
+    console.log('[auth] upsert returned, has error:', !!upsertResult.error)
+
+    if (upsertResult.error) {
+      console.error('[auth] upsert FAILED')
+      console.error('[auth] error code:', upsertResult.error.code)
+      console.error('[auth] error message:', upsertResult.error.message)
+      console.error('[auth] error details:', upsertResult.error.details)
+      console.error('[auth] error hint:', upsertResult.error.hint)
+      console.error('[auth] full error object:', upsertResult.error)
       return
     }
 
-    // Обновим аватарку отдельно, если она изменилась (upsert мог перетереть имя)
+    const data = upsertResult.data
+    console.log('[auth] user data received:', data)
+
+    if (!data) {
+      console.error('[auth] upsert returned no data and no error - unexpected')
+      return
+    }
+
     if (avatarUrl && avatarUrl !== data.avatar_url) {
+      console.log('[auth] updating avatar_url')
       await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', data.id)
     }
 
+    console.log('[auth] calling setUser with:', data)
     setUser({ ...data, avatar_url: avatarUrl ?? data.avatar_url })
-    // needsProfile = true только если у юзера ещё нет telegram или game_id
     setNeedsProfile(!data.telegram || !data.game_id)
+    console.log('[auth] loadOrCreateUser DONE')
   }
 
   async function signInWithGoogle() {
+    console.log('[auth] signInWithGoogle clicked')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -129,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithDiscord() {
+    console.log('[auth] signInWithDiscord clicked')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
@@ -140,8 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    console.log('[auth] signOut called')
     await supabase.auth.signOut()
-    // Состояние очистится через событие SIGNED_OUT
   }
 
   async function updateProfile(data: Partial<User>) {
