@@ -3,7 +3,14 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = 'https://xgxhpmvrmaezuonatyjk.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneGhwbXZybWFlenVvbmF0eWprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMTgyNTMsImV4cCI6MjA5MDc5NDI1M30.0i_FqafbpE9J3m6qi4BgH1blUciKw6yQKMnw2Db0erA'
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    flowType: 'pkce',
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+})
 
 export type User = {
   id: string
