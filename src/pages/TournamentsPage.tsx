@@ -197,10 +197,9 @@ export default function TournamentsPage() {
         .from('tournaments')
         .select('*')
         .order('created_at', { ascending: false })
-      if (!error && data && data.length > 0) setTournaments(data)
-      else setTournaments(DEMO_TOURNAMENTS)
-    } catch {
-      setTournaments(DEMO_TOURNAMENTS)
+      if (!error && data) setTournaments(data)
+    } catch (e) {
+      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -259,8 +258,8 @@ export default function TournamentsPage() {
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-64 rounded-2xl skeleton" />)
           ) : filtered.length === 0 ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
-              В этой категории пока пусто
+            <div className="col-span-full rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+              <div className="font-display text-4xl uppercase text-muted-foreground/30">Soon</div>
             </div>
           ) : filtered.map((t, i) => {
             const isOrganizer = user?.id === t.organizer_id
