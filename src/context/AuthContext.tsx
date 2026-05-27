@@ -17,6 +17,18 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+// Таймаут для запросов к БД (защита от зависаний на shared pooler)
+const DB_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+    ),
+  ])
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,12 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     let handled = false
 
-    console.log('[auth] AuthProvider mounted, subscribing...')
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
-        console.log('[auth]', event, 'session:', !!session, 'handled:', handled)
 
         if (event === 'SIGNED_OUT') {
           setUser(null)
@@ -41,44 +50,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user && !handled) {
-          console.log('[auth] about to call loadOrCreateUser')
           handled = true
           try {
             await loadOrCreateUser(session)
-            console.log('[auth] loadOrCreateUser returned successfully')
           } catch (err) {
-            console.error('[auth] loadOrCreateUser threw exception:', err)
+            console.error('Auth: load user failed', err)
           }
-        } else if (session?.user && handled) {
-          console.log('[auth] session present but handled=true, skipping')
         }
 
-        if (event === 'INITIAL_SESSION') {
-          setLoading(false)
-        }
-
-        if (event === 'SIGNED_IN') {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
           setLoading(false)
         }
       }
     )
 
     return () => {
-      console.log('[auth] AuthProvider unmounting')
       mounted = false
       subscription.unsubscribe()
     }
   }, [])
 
   async function loadOrCreateUser(session: Session) {
-    console.log('[auth] loadOrCreateUser START')
     const oauthUser = session.user
-    console.log('[auth] oauth user:', {
-      id: oauthUser.id,
-      email: oauthUser.email,
-      provider: oauthUser.app_metadata?.provider,
-    })
-
     const meta = oauthUser.user_metadata || {}
     const name =
       meta.full_name ||
@@ -89,112 +82,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const avatarText = name.slice(0, 2).toUpperCase()
     const avatarUrl = meta.avatar_url || meta.picture || null
 
-    console.log('[auth] computed values:', { name, avatarText, avatarUrl })
-
-    console.log('[auth] trying SELECT first...')
-    const selectPromise = supabase
-      .from('users')
-      .select('*')
-      .eq('provider_id', oauthUser.id)
-      .limit(1)
-
-    const selectTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('SELECT TIMEOUT 5s')), 5000)
-    )
-
+    // Сначала ищем существующего юзера
     let existingUser: any = null
     try {
-      const selectResult: any = await Promise.race([selectPromise, selectTimeout])
-      console.log('[auth] SELECT result:', selectResult)
-      if (selectResult.error) {
-        console.error('[auth] SELECT error:', selectResult.error)
-      }
-      existingUser = selectResult.data && selectResult.data.length > 0 ? selectResult.data[0] : null
-    } catch (err) {
-      console.error('[auth] SELECT timed out:', err)
-    }
-
-    if (existingUser) {
-      console.log('[auth] existing user found, using SELECT result')
-
-      if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
-        supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', existingUser.id).then(
-          (r) => console.log('[auth] avatar update result:', r),
-          (e) => console.error('[auth] avatar update failed:', e)
-        )
-      }
-
-      setUser({ ...existingUser, avatar_url: avatarUrl ?? existingUser.avatar_url })
-      setNeedsProfile(!existingUser.telegram || !existingUser.game_id)
-      console.log('[auth] loadOrCreateUser DONE (from SELECT)')
-      return
-    }
-
-    console.log('[auth] no existing user, trying INSERT...')
-    const insertPromise = supabase
-      .from('users')
-      .insert({
-        provider_id: oauthUser.id,
-        provider: oauthUser.app_metadata?.provider || 'google',
-        name,
-        avatar: avatarText,
-        avatar_url: avatarUrl,
-        role: 'player',
-        lang: 'ru',
-      })
-      .select()
-
-    const insertTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('INSERT TIMEOUT 8s')), 8000)
-    )
-
-    let insertResult: any
-    try {
-      insertResult = await Promise.race([insertPromise, insertTimeout])
-      console.log('[auth] INSERT returned, has error:', !!insertResult.error)
-    } catch (err) {
-      console.error('[auth] INSERT TIMED OUT')
-      console.error('[auth] timeout error:', err)
-      return
-    }
-
-    if (insertResult.error) {
-      console.error('[auth] INSERT failed')
-      console.error('[auth] error code:', insertResult.error.code)
-      console.error('[auth] error message:', insertResult.error.message)
-      console.error('[auth] error details:', insertResult.error.details)
-      console.error('[auth] error hint:', insertResult.error.hint)
-
-      if (insertResult.error.code === '23505') {
-        console.log('[auth] duplicate detected, retry SELECT...')
-        const retry = await supabase
+      const result: any = await withTimeout(
+        supabase
           .from('users')
           .select('*')
           .eq('provider_id', oauthUser.id)
-          .limit(1)
-        if (retry.data && retry.data.length > 0) {
-          const u = retry.data[0]
-          setUser({ ...u, avatar_url: avatarUrl ?? u.avatar_url })
-          setNeedsProfile(!u.telegram || !u.game_id)
-          console.log('[auth] loadOrCreateUser DONE (recovered from duplicate)')
-        }
+          .limit(1),
+        DB_TIMEOUT_MS,
+        'SELECT users'
+      )
+      if (!result.error && result.data?.length > 0) {
+        existingUser = result.data[0]
       }
+    } catch (err) {
+      console.error('Auth: SELECT failed', err)
+    }
+
+    if (existingUser) {
+      // Обновляем аватарку в фоне если изменилась (не блокируем)
+      if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
+        supabase
+          .from('users')
+          .update({ avatar_url: avatarUrl })
+          .eq('id', existingUser.id)
+          .then(undefined, (e) => console.error('Auth: avatar update failed', e))
+      }
+      setUser({ ...existingUser, avatar_url: avatarUrl ?? existingUser.avatar_url })
+      setNeedsProfile(!existingUser.telegram || !existingUser.game_id)
       return
     }
 
-    const data = insertResult.data && insertResult.data.length > 0 ? insertResult.data[0] : null
-    if (!data) {
-      console.error('[auth] INSERT returned no data')
-      return
+    // Юзера нет — создаём
+    try {
+      const result: any = await withTimeout(
+        supabase
+          .from('users')
+          .insert({
+            provider_id: oauthUser.id,
+            provider: oauthUser.app_metadata?.provider || 'google',
+            name,
+            avatar: avatarText,
+            avatar_url: avatarUrl,
+            role: 'player',
+            lang: 'ru',
+          })
+          .select(),
+        DB_TIMEOUT_MS,
+        'INSERT user'
+      )
+
+      if (result.error) {
+        // Duplicate key — кто-то параллельно создал, забираем существующего
+        if (result.error.code === '23505') {
+          const retry: any = await supabase
+            .from('users')
+            .select('*')
+            .eq('provider_id', oauthUser.id)
+            .limit(1)
+          if (retry.data?.length > 0) {
+            const u = retry.data[0]
+            setUser({ ...u, avatar_url: avatarUrl ?? u.avatar_url })
+            setNeedsProfile(!u.telegram || !u.game_id)
+          }
+          return
+        }
+        console.error('Auth: INSERT failed', result.error)
+        return
+      }
+
+      const data = result.data?.[0]
+      if (!data) {
+        console.error('Auth: INSERT returned empty data')
+        return
+      }
+
+      setUser({ ...data, avatar_url: avatarUrl ?? data.avatar_url })
+      setNeedsProfile(true)
+    } catch (err) {
+      console.error('Auth: INSERT failed', err)
     }
-    console.log('[auth] new user created:', data)
-    setUser({ ...data, avatar_url: avatarUrl ?? data.avatar_url })
-    setNeedsProfile(true)
-    console.log('[auth] loadOrCreateUser DONE (from INSERT)')
   }
 
   async function signInWithGoogle() {
-    console.log('[auth] signInWithGoogle clicked')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -205,11 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     })
-    if (error) console.error('[auth] google signin error:', error)
+    if (error) console.error('Auth: Google sign-in error', error)
   }
 
   async function signInWithDiscord() {
-    console.log('[auth] signInWithDiscord clicked')
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
@@ -217,18 +188,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         scopes: 'identify email',
       },
     })
-    if (error) console.error('[auth] discord signin error:', error)
+    if (error) console.error('Auth: Discord sign-in error', error)
   }
 
   async function signOut() {
-    console.log('[auth] signOut called')
     await supabase.auth.signOut()
   }
 
   async function updateProfile(data: Partial<User>) {
     if (!user) return
     const { error } = await supabase.from('users').update(data).eq('id', user.id)
-    if (!error) setUser(prev => (prev ? { ...prev, ...data } : prev))
+    if (!error) setUser((prev) => (prev ? { ...prev, ...data } : prev))
   }
 
   async function completeRegistration(nick: string, telegram: string, gameId: string) {
@@ -238,10 +208,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .update({ name: nick, telegram, game_id: gameId })
       .eq('id', user.id)
     if (error) {
-      console.error('[auth] complete registration failed:', error)
+      console.error('Auth: complete registration failed', error)
       return
     }
-    setUser(prev => (prev ? { ...prev, name: nick, telegram, game_id: gameId } : prev))
+    setUser((prev) => (prev ? { ...prev, name: nick, telegram, game_id: gameId } : prev))
     setNeedsProfile(false)
   }
 
