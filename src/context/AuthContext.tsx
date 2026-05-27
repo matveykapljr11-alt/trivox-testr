@@ -91,14 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log('[auth] computed values:', { name, avatarText, avatarUrl })
 
-    // Сначала пробуем найти существующего юзера через SELECT
-    // (быстрее и обходит проблему с upsert)
     console.log('[auth] trying SELECT first...')
     const selectPromise = supabase
       .from('users')
       .select('*')
       .eq('provider_id', oauthUser.id)
-      .maybeSingle()
+      .limit(1)
 
     const selectTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('SELECT TIMEOUT 5s')), 5000)
@@ -111,16 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (selectResult.error) {
         console.error('[auth] SELECT error:', selectResult.error)
       }
-      existingUser = selectResult.data
+      existingUser = selectResult.data && selectResult.data.length > 0 ? selectResult.data[0] : null
     } catch (err) {
       console.error('[auth] SELECT timed out:', err)
     }
 
-    // Если юзер найден — просто используем его
     if (existingUser) {
       console.log('[auth] existing user found, using SELECT result')
-      
-      // Обновим аватарку если изменилась (best effort, не блокируем)
+
       if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
         supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', existingUser.id).then(
           (r) => console.log('[auth] avatar update result:', r),
@@ -134,7 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Юзер не найден — нужно создать через INSERT
     console.log('[auth] no existing user, trying INSERT...')
     const insertPromise = supabase
       .from('users')
@@ -148,7 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lang: 'ru',
       })
       .select()
-      .single()
 
     const insertTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('INSERT TIMEOUT 8s')), 8000)
@@ -171,24 +165,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('[auth] error details:', insertResult.error.details)
       console.error('[auth] error hint:', insertResult.error.hint)
 
-      // Если это duplicate key — значит юзер всё-таки есть, попробуем достать
       if (insertResult.error.code === '23505') {
         console.log('[auth] duplicate detected, retry SELECT...')
         const retry = await supabase
           .from('users')
           .select('*')
           .eq('provider_id', oauthUser.id)
-          .single()
-        if (retry.data) {
-          setUser({ ...retry.data, avatar_url: avatarUrl ?? retry.data.avatar_url })
-          setNeedsProfile(!retry.data.telegram || !retry.data.game_id)
+          .limit(1)
+        if (retry.data && retry.data.length > 0) {
+          const u = retry.data[0]
+          setUser({ ...u, avatar_url: avatarUrl ?? u.avatar_url })
+          setNeedsProfile(!u.telegram || !u.game_id)
           console.log('[auth] loadOrCreateUser DONE (recovered from duplicate)')
         }
       }
       return
     }
 
-    const data = insertResult.data
+    const data = insertResult.data && insertResult.data.length > 0 ? insertResult.data[0] : null
+    if (!data) {
+      console.error('[auth] INSERT returned no data')
+      return
+    }
     console.log('[auth] new user created:', data)
     setUser({ ...data, avatar_url: avatarUrl ?? data.avatar_url })
     setNeedsProfile(true)
