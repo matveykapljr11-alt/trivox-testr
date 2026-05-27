@@ -91,56 +91,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log('[auth] computed values:', { name, avatarText, avatarUrl })
 
-    console.log('[auth] calling upsert...')
-    const upsertResult = await supabase
+    // Сначала пробуем найти существующего юзера через SELECT
+    // (быстрее и обходит проблему с upsert)
+    console.log('[auth] trying SELECT first...')
+    const selectPromise = supabase
       .from('users')
-      .upsert(
-        {
-          provider_id: oauthUser.id,
-          provider: oauthUser.app_metadata?.provider || 'google',
-          name,
-          avatar: avatarText,
-          avatar_url: avatarUrl,
-          role: 'player',
-          lang: 'ru',
-        },
-        {
-          onConflict: 'provider_id',
-          ignoreDuplicates: false,
-        }
-      )
+      .select('*')
+      .eq('provider_id', oauthUser.id)
+      .maybeSingle()
+
+    const selectTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('SELECT TIMEOUT 5s')), 5000)
+    )
+
+    let existingUser: any = null
+    try {
+      const selectResult: any = await Promise.race([selectPromise, selectTimeout])
+      console.log('[auth] SELECT result:', selectResult)
+      if (selectResult.error) {
+        console.error('[auth] SELECT error:', selectResult.error)
+      }
+      existingUser = selectResult.data
+    } catch (err) {
+      console.error('[auth] SELECT timed out:', err)
+    }
+
+    // Если юзер найден — просто используем его
+    if (existingUser) {
+      console.log('[auth] existing user found, using SELECT result')
+      
+      // Обновим аватарку если изменилась (best effort, не блокируем)
+      if (avatarUrl && avatarUrl !== existingUser.avatar_url) {
+        supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', existingUser.id).then(
+          (r) => console.log('[auth] avatar update result:', r),
+          (e) => console.error('[auth] avatar update failed:', e)
+        )
+      }
+
+      setUser({ ...existingUser, avatar_url: avatarUrl ?? existingUser.avatar_url })
+      setNeedsProfile(!existingUser.telegram || !existingUser.game_id)
+      console.log('[auth] loadOrCreateUser DONE (from SELECT)')
+      return
+    }
+
+    // Юзер не найден — нужно создать через INSERT
+    console.log('[auth] no existing user, trying INSERT...')
+    const insertPromise = supabase
+      .from('users')
+      .insert({
+        provider_id: oauthUser.id,
+        provider: oauthUser.app_metadata?.provider || 'google',
+        name,
+        avatar: avatarText,
+        avatar_url: avatarUrl,
+        role: 'player',
+        lang: 'ru',
+      })
       .select()
       .single()
 
-    console.log('[auth] upsert returned, has error:', !!upsertResult.error)
+    const insertTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('INSERT TIMEOUT 8s')), 8000)
+    )
 
-    if (upsertResult.error) {
-      console.error('[auth] upsert FAILED')
-      console.error('[auth] error code:', upsertResult.error.code)
-      console.error('[auth] error message:', upsertResult.error.message)
-      console.error('[auth] error details:', upsertResult.error.details)
-      console.error('[auth] error hint:', upsertResult.error.hint)
-      console.error('[auth] full error object:', upsertResult.error)
+    let insertResult: any
+    try {
+      insertResult = await Promise.race([insertPromise, insertTimeout])
+      console.log('[auth] INSERT returned, has error:', !!insertResult.error)
+    } catch (err) {
+      console.error('[auth] INSERT TIMED OUT')
+      console.error('[auth] timeout error:', err)
       return
     }
 
-    const data = upsertResult.data
-    console.log('[auth] user data received:', data)
+    if (insertResult.error) {
+      console.error('[auth] INSERT failed')
+      console.error('[auth] error code:', insertResult.error.code)
+      console.error('[auth] error message:', insertResult.error.message)
+      console.error('[auth] error details:', insertResult.error.details)
+      console.error('[auth] error hint:', insertResult.error.hint)
 
-    if (!data) {
-      console.error('[auth] upsert returned no data and no error - unexpected')
+      // Если это duplicate key — значит юзер всё-таки есть, попробуем достать
+      if (insertResult.error.code === '23505') {
+        console.log('[auth] duplicate detected, retry SELECT...')
+        const retry = await supabase
+          .from('users')
+          .select('*')
+          .eq('provider_id', oauthUser.id)
+          .single()
+        if (retry.data) {
+          setUser({ ...retry.data, avatar_url: avatarUrl ?? retry.data.avatar_url })
+          setNeedsProfile(!retry.data.telegram || !retry.data.game_id)
+          console.log('[auth] loadOrCreateUser DONE (recovered from duplicate)')
+        }
+      }
       return
     }
 
-    if (avatarUrl && avatarUrl !== data.avatar_url) {
-      console.log('[auth] updating avatar_url')
-      await supabase.from('users').update({ avatar_url: avatarUrl }).eq('id', data.id)
-    }
-
-    console.log('[auth] calling setUser with:', data)
+    const data = insertResult.data
+    console.log('[auth] new user created:', data)
     setUser({ ...data, avatar_url: avatarUrl ?? data.avatar_url })
-    setNeedsProfile(!data.telegram || !data.game_id)
-    console.log('[auth] loadOrCreateUser DONE')
+    setNeedsProfile(true)
+    console.log('[auth] loadOrCreateUser DONE (from INSERT)')
   }
 
   async function signInWithGoogle() {
