@@ -161,15 +161,8 @@ export default function HomePage() {
 
         <div className="relative z-10 border-t border-white/10">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 text-xs text-white/40 md:px-6">
-            <div>TRIVOX · Season 01</div>
-            
-              href="https://discord.gg/VXRyzFzcP"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-white/80 transition"
-            >
-              Discord →
-            </a>
+            <div>TRIVOX Season 01</div>
+            <a href="https://discord.gg/VXRyzFzcP" target="_blank" rel="noreferrer" className="hover:text-white/80 transition">Discord</a>
           </div>
         </div>
       </div>
