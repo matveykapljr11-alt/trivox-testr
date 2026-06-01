@@ -8,10 +8,6 @@ import { toast } from 'sonner'
 
 const nav = [
   { to: '/praki', label: 'Праки' },
-  { to: '/teams', label: 'Команды' },
-  { to: '/players', label: 'Игроки' },
-  { to: '/tournaments', label: 'Турниры' },
-  { to: '/my-team', label: 'Моя команда' },
 ]
 
 function useTheme() {
@@ -294,7 +290,7 @@ export function SiteHeader() {
                         </div>
                       ) : (
                         <div className="divide-y divide-border">
-                          {displayItems.map((item: any, i) => {
+                          {displayItems.map((item: any) => {
                             if (item._type === 'scrim') {
                               return (
                                 <div key={item.id} className="p-4 hover:bg-muted/30 transition">
@@ -392,9 +388,9 @@ export function SiteHeader() {
 
                     {/* Footer */}
                     <div className="border-t border-border p-2">
-                      <Link to="/my-team" onClick={() => setBellOpen(false)}
+                      <Link to="/profile" onClick={() => setBellOpen(false)}
                         className="flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition">
-                        Перейти в мою команду →
+                        Перейти в профиль →
                       </Link>
                     </div>
                   </div>
