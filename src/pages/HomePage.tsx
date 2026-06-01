@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Zap, ArrowRight, Clock, Users } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
@@ -18,13 +18,11 @@ export default function HomePage() {
   useEffect(() => {
     async function loadLiveStats() {
       try {
-        // Активные открытые праки
         const { count: scrimCount } = await supabase
           .from('scrims')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'open')
 
-        // Всего игроков (пока заменим на онлайн позже)
         const { count: userCount } = await supabase
           .from('users')
           .select('id', { count: 'exact', head: true })
@@ -51,14 +49,12 @@ export default function HomePage() {
   return (
     <PageShell>
       <section className="relative overflow-hidden bg-dark min-h-[calc(100vh-4rem)]">
-        {/* Фон */}
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-0 bg-grid opacity-50" />
           <div className="absolute -top-40 left-1/2 h-[700px] w-[1000px] -translate-x-1/2 rounded-full bg-mesh animate-float opacity-80" />
           <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-background" />
         </div>
 
-        {/* Live статус сверху */}
         <div className="relative z-10 border-b border-white/10">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60 md:px-6">
             <div className="flex items-center gap-2">
@@ -76,7 +72,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Hero */}
         <div className="relative z-10 mx-auto max-w-4xl px-4 pb-16 pt-16 md:px-6 md:pb-24 md:pt-24">
           <div className="text-center">
             <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-neon/30 bg-neon/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.25em] text-neon backdrop-blur animate-fade-in-up">
@@ -105,7 +100,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Соцдоказательство — три числа */}
             <div className="mx-auto mt-16 grid max-w-2xl grid-cols-3 gap-3 md:gap-6 animate-fade-in-up" style={{ animationDelay: '320ms' }}>
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                 <div className="flex items-center justify-center gap-1.5 text-neon">
@@ -134,7 +128,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Простое «как работает» — 3 шага без воды */}
         <div className="relative z-10 border-t border-white/10 bg-black/30">
           <div className="mx-auto max-w-4xl px-4 py-12 md:px-6 md:py-16">
             <div className="grid gap-6 md:grid-cols-3">
@@ -169,7 +162,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Footer-микро */}
         <div className="relative z-10 border-t border-white/10">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 text-xs text-white/40 md:px-6">
             <div className="font-mono-tabular">TRIVOX · Season 01</div>
