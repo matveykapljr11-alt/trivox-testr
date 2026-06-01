@@ -6,8 +6,6 @@ import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
 import { supabase } from '../lib/supabase'
 
-// Главная фаза 1 — один CTA, всё ведёт в Праки
-
 export default function HomePage() {
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
