@@ -12,8 +12,9 @@ const FORMATS = ['5x5 / MR12', '5x5 / MR9', '2x2', '1x1']
 const chips = [
   { id: 'all', label: 'Все' },
   { id: 'today', label: 'Сегодня' },
-  { id: 'mr12', label: 'MR12' },
-  { id: 'mr9', label: 'MR9' },
+  { id: '1x1', label: '1x1' },
+  { id: '2x2', label: '2x2' },
+  { id: '5x5', label: '5x5' },
 ]
 
 function formatDateLabel(dateStr: string): string {
@@ -41,7 +42,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   const { user } = useAuth()
   const [teamName, setTeamName] = useState('')
   const [teamLoading, setTeamLoading] = useState(false)
-  const [hasTeam, setHasTeam] = useState(true)
   const [format, setFormat] = useState('5x5 / MR12')
   const [selectedMaps, setSelectedMaps] = useState<string[]>([])
   const [scrimDatetime, setScrimDatetime] = useState('')
@@ -56,16 +56,14 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
       .from('teams')
       .select('name, discord, telegram')
       .eq('owner_id', user.id)
-      .single()
+      .limit(1)
       .then(({ data }) => {
-        if (data) {
-          setTeamName(data.name)
-          setHasTeam(true)
-          if (data.discord) setDiscord(data.discord)
-          if (data.telegram) setTelegram(data.telegram)
+        if (data && data[0]) {
+          setTeamName(data[0].name)
+          if (data[0].discord) setDiscord(data[0].discord)
+          if (data[0].telegram) setTelegram(data[0].telegram)
         } else {
-          setHasTeam(false)
-          setTeamName('')
+          setTeamName(user.name || '')
         }
         setTeamLoading(false)
       })
@@ -74,7 +72,7 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   const timeLabel = scrimDatetime ? formatDateLabel(scrimDatetime) : 'Время не указано'
 
   const preview = {
-    team_name: teamName || 'Название команды',
+    team_name: teamName || 'Твой ник',
     format,
     maps: selectedMaps.length ? selectedMaps : ['—'],
     time_text: timeLabel,
@@ -85,11 +83,7 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
   }
 
   async function handleCreate() {
-    if (!hasTeam) {
-      toast.error('Сначала создай команду', { description: 'Перейди на страницу Команды' })
-      return
-    }
-    if (!teamName.trim()) { toast.error('Укажи название команды'); return }
+    if (!teamName.trim()) { toast.error('Укажи ник или название команды'); return }
     if (!scrimDatetime) { toast.error('Укажи дату и время прака'); return }
     if (!user) return
 
@@ -121,6 +115,10 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
   if (!open) return null
 
+  const isSolo = format === '1x1' || format === '2x2'
+  const nameLabel = isSolo ? 'Твой ник' : 'Название команды'
+  const namePlaceholder = isSolo ? 'Kapleux' : 'Твоя команда'
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
@@ -131,12 +129,6 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
           <h2 className="font-display text-xl uppercase">Создать прак</h2>
           <button onClick={onClose} className="press rounded-md p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
-
-        {!hasTeam && !teamLoading && (
-          <div className="mx-5 mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-700">
-            ⚠️ У тебя нет команды. <a href="/teams" className="font-semibold underline">Создай команду</a> перед публикацией прака.
-          </div>
-        )}
 
         <div className="border-b border-border bg-muted/40 px-5 py-3">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Превью карточки</div>
@@ -161,11 +153,11 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
         <div className="space-y-4 p-5">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Название команды</label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">{nameLabel}</label>
             <input
               value={teamLoading ? 'Загружаем...' : teamName}
               onChange={e => setTeamName(e.target.value)}
-              placeholder="Твоя команда"
+              placeholder={namePlaceholder}
               disabled={teamLoading}
               className="h-11 w-full rounded-xl border border-border bg-muted/60 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
@@ -208,9 +200,7 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Дата и время прака *
-            </label>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Дата и время прака *</label>
             <input
               type="datetime-local"
               value={scrimDatetime}
@@ -246,10 +236,10 @@ function CreateScrimModal({ open, onClose, onCreated }: { open: boolean; onClose
 
           <button
             onClick={handleCreate}
-            disabled={loading || !hasTeam || teamLoading}
+            disabled={loading || teamLoading}
             className="press mt-2 h-12 w-full rounded-xl bg-gradient-to-r from-primary to-electric text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-soft transition hover:opacity-90 disabled:opacity-60"
           >
-            {loading ? 'Создаём...' : !hasTeam ? 'Сначала создай команду' : 'Опубликовать прак'}
+            {loading ? 'Создаём...' : 'Опубликовать прак'}
           </button>
         </div>
       </div>
@@ -360,7 +350,6 @@ export default function PrakiPage() {
   const [challengeScrim, setChallengeScrim] = useState<Scrim | null>(null)
 
   async function loadScrims() {
-    setLoading(true)
     try {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       const { data, error } = await supabase
@@ -377,12 +366,17 @@ export default function PrakiPage() {
     }
   }
 
-  useEffect(() => { loadScrims() }, [])
+  useEffect(() => {
+    loadScrims()
+    const interval = setInterval(loadScrims, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const filtered = useMemo(() => {
     return scrims.filter(m => {
-      if (filter === 'mr12') return m.format.includes('MR12')
-      if (filter === 'mr9') return m.format.includes('MR9')
+      if (filter === '1x1') return m.format.includes('1x1')
+      if (filter === '2x2') return m.format.includes('2x2')
+      if (filter === '5x5') return m.format.includes('5x5')
       if (filter === 'today') {
         const t = m.time_raw ? new Date(m.time_raw) : new Date(m.created_at)
         const today = new Date()
@@ -442,7 +436,7 @@ export default function PrakiPage() {
             <input
               value={q}
               onChange={e => setQ(e.target.value)}
-              placeholder="Поиск по команде, карте..."
+              placeholder="Поиск по нику, карте..."
               className="h-12 w-full rounded-lg border border-border bg-card pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
             />
           </div>
@@ -482,9 +476,18 @@ export default function PrakiPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-            <h3 className="font-display text-xl uppercase">Праков нет</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Попробуй другие фильтры или создай свой прак.</p>
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-gradient-to-br from-card to-primary/5 p-12 text-center">
+            <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <Plus className="h-8 w-8" />
+            </div>
+            <h3 className="font-display text-2xl uppercase">Будь первым</h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">Сейчас никто не ищет соперника. Создай прак за 10 секунд — игроки придут.</p>
+            <button
+              onClick={() => isLoggedIn ? setCreateOpen(true) : setAuthOpen(true)}
+              className="press mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-electric px-8 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-soft hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> Создать прак
+            </button>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
