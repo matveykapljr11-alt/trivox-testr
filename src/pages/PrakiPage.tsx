@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Filter, Clock, Users, Plus, X, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Search, Filter, Clock, Users, Plus, X, AlertTriangle, CheckCircle, Flame } from 'lucide-react'
 import { PageShell, PageHero } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { AuthModal } from '../components/AuthModal'
+import { SwipeMode } from '../components/SwipeMode'
 import { supabase, type Scrim } from '../lib/supabase'
 import { toast } from 'sonner'
 
@@ -346,6 +347,7 @@ export default function PrakiPage() {
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [swipeOpen, setSwipeOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [challengeScrim, setChallengeScrim] = useState<Scrim | null>(null)
 
@@ -444,6 +446,12 @@ export default function PrakiPage() {
             <Filter className="h-4 w-4" /> Фильтры
           </button>
           <button
+            onClick={() => isLoggedIn ? setSwipeOpen(true) : setAuthOpen(true)}
+            className="press inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-orange-500 to-pink-500 px-5 text-sm font-bold uppercase tracking-wider text-white shadow-glow hover:opacity-90"
+          >
+            <Flame className="h-4 w-4" fill="currentColor" /> Свайп режим
+          </button>
+          <button
             onClick={() => isLoggedIn ? setCreateOpen(true) : setAuthOpen(true)}
             className="press inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-electric px-5 text-sm font-semibold text-primary-foreground shadow-soft hover:opacity-90"
           >
@@ -507,6 +515,7 @@ export default function PrakiPage() {
 
       <CreateScrimModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={loadScrims} />
       <ChallengeModal scrim={challengeScrim} open={!!challengeScrim} onClose={() => setChallengeScrim(null)} onConfirm={confirmChallenge} />
+      <SwipeMode open={swipeOpen} onClose={() => { setSwipeOpen(false); loadScrims() }} />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </PageShell>
   )
